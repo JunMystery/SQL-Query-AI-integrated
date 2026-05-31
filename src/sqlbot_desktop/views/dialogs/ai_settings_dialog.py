@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTextEdit,
     QVBoxLayout,
 )
@@ -37,6 +38,9 @@ class AISettingsDialog(QDialog):
         self.model_path_input = QLineEdit()
         self.api_endpoint_input = QLineEdit()
         self.api_model_input = QLineEdit()
+        self.context_size_spin = QSpinBox()
+        self.max_tokens_spin = QSpinBox()
+        self.threads_spin = QSpinBox()
         self.model_info = QLabel("")
         self.resource_info = QLabel("")
         self.test_output = QTextEdit()
@@ -55,6 +59,9 @@ class AISettingsDialog(QDialog):
             local_model_path=self.model_path_input.text().strip(),
             api_endpoint=self.api_endpoint_input.text().strip(),
             api_model=self.api_model_input.text().strip(),
+            context_size=self.context_size_spin.value(),
+            max_tokens=self.max_tokens_spin.value(),
+            threads=self.threads_spin.value(),
         )
 
     def set_config(self, config: AIModelConfig) -> None:
@@ -63,6 +70,9 @@ class AISettingsDialog(QDialog):
         self.model_path_input.setText(config.local_model_path)
         self.api_endpoint_input.setText(config.api_endpoint)
         self.api_model_input.setText(config.api_model)
+        self.context_size_spin.setValue(config.context_size or 4096)
+        self.max_tokens_spin.setValue(config.max_tokens or 512)
+        self.threads_spin.setValue(config.threads or 4)
         self._select_model_path(config.local_model_path)
         self._refresh_model_info()
 
@@ -90,6 +100,36 @@ class AISettingsDialog(QDialog):
         self._build_api_panel()
         layout.addWidget(self.local_panel)
         layout.addWidget(self.api_panel)
+
+        # Token Manager Section
+        token_panel = QFrame()
+        token_panel.setObjectName("settingsPanel")
+        token_layout = QHBoxLayout(token_panel)
+        token_layout.setSpacing(14)
+
+        self.context_size_spin.setRange(256, 32768)
+        self.context_size_spin.setSingleStep(256)
+        self.context_size_spin.setValue(4096)
+        self.context_size_spin.setAccessibleName("Context size limit")
+
+        self.max_tokens_spin.setRange(64, 8192)
+        self.max_tokens_spin.setSingleStep(64)
+        self.max_tokens_spin.setValue(512)
+        self.max_tokens_spin.setAccessibleName("Max output tokens")
+
+        self.threads_spin.setRange(1, 32)
+        self.threads_spin.setSingleStep(1)
+        self.threads_spin.setValue(4)
+        self.threads_spin.setAccessibleName("CPU threads count")
+
+        token_layout.addWidget(QLabel("Context Size (n_ctx)"))
+        token_layout.addWidget(self.context_size_spin, 1)
+        token_layout.addWidget(QLabel("Max Tokens (max_tokens)"))
+        token_layout.addWidget(self.max_tokens_spin, 1)
+        token_layout.addWidget(QLabel("Threads (luồng)"))
+        token_layout.addWidget(self.threads_spin, 1)
+
+        layout.addWidget(token_panel)
 
         self.test_output.setReadOnly(True)
         self.test_output.setFixedHeight(86)

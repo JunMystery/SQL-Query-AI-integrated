@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
-    QListWidget,
     QMainWindow,
     QMenu,
     QMenuBar,
@@ -26,15 +25,29 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QTableWidget,
     QTableWidgetItem,
+    QTextBrowser,
     QTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtGui import QFont, QColor
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ColumnInfo, ConnectionProfile, TableInfo
 from sqlbot_desktop.views.assets import asset_path
 from sqlbot_desktop.views.components.schema_tree_widget import SchemaTreeWidget
+from sqlbot_desktop.views.dialogs.query_results_dialog import QueryResultsDialog
+
+
+class PromptEdit(QTextEdit):
+    returnPressed = Signal()
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+            self.returnPressed.emit()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -52,6 +65,10 @@ class MainWindow(QMainWindow):
     bookmarks_requested = Signal()
     schema_requested = Signal()
     settings_requested = Signal()
+    cancel_requested = Signal()
+    schema_assistant_requested = Signal()
+    show_results_requested = Signal()
+    clear_chat_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -70,9 +87,10 @@ class MainWindow(QMainWindow):
         self.busy_title_label = QLabel("")
         self.busy_detail_label = QLabel("")
         self.busy_progress = QProgressBar()
-        self.question_input = QTextEdit()
-        self.suggested_queries = QListWidget()
-        self.results_table = QTableWidget()
+        self.question_input = PromptEdit()
+        self.chat_view = QTextBrowser()
+        self.sql_editor = QTextEdit()
+        self.results_dialog = QueryResultsDialog(self)
         self.schema_tree = SchemaTreeWidget()
         self.schema_summary_label = QLabel("Schema chưa tải")
         self.schema_dock: QDockWidget | None = None
@@ -115,14 +133,14 @@ class MainWindow(QMainWindow):
         root = QWidget()
         root.setObjectName("mainRoot")
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(28, 24, 28, 20)
-        root_layout.setSpacing(18)
+        root_layout.setContentsMargins(20, 14, 20, 12)
+        root_layout.setSpacing(10)
 
         root_layout.addLayout(self._build_header())
         root_layout.addWidget(self._build_ai_panel())
         root_layout.addWidget(self._build_busy_panel())
-        root_layout.addWidget(self._build_query_panel())
-        root_layout.addWidget(self._build_results_panel(), 1)
+        root_layout.addWidget(self._build_upper_workspace_panel())
+        root_layout.addWidget(self._build_chat_panel(), 1)
 
         self.setCentralWidget(root)
 
@@ -143,34 +161,9 @@ class MainWindow(QMainWindow):
         self.connection_label.setMinimumWidth(120)
         self.connection_label.setMaximumWidth(200)
 
-        settings_button = QToolButton()
-        settings_button.setObjectName("settingsIconButton")
-        settings_button.setIcon(QIcon(str(asset_path("icons", "settings.svg"))))
-        settings_button.setToolTip("Settings")
-        settings_button.setAccessibleName("Settings")
-        settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        settings_button.setMenu(self._build_settings_menu(settings_button))
-
         header.addLayout(title_group, 1)
         header.addWidget(self.connection_label)
-        header.addWidget(settings_button)
         return header
-
-    def _build_settings_menu(self, parent: QWidget) -> QMenu:
-        menu = QMenu(parent)
-        actions = [
-            ("History", self.history_requested),
-            ("Bookmarks", self.bookmarks_requested),
-            ("Schema", self.schema_requested),
-            ("Settings", self.settings_requested),
-        ]
-        for label, signal in actions:
-            action = QAction(label, self)
-            if label == "Schema":
-                action.triggered.connect(lambda checked=False: self.show_schema_viewer())
-            action.triggered.connect(lambda checked=False, target=signal: target.emit())
-            menu.addAction(action)
-        return menu
 
     def _build_schema_dock(self) -> None:
         dock = QDockWidget("Schema Viewer", self)
@@ -273,110 +266,129 @@ class MainWindow(QMainWindow):
         self.busy_progress.setTextVisible(False)
         self.busy_progress.setFixedWidth(260)
 
+        self.cancel_button = QPushButton("Hủy")
+        self.cancel_button.setObjectName("dangerButton")
+        self.cancel_button.setFixedWidth(80)
+        self.cancel_button.clicked.connect(self.cancel_requested.emit)
+
         layout.addLayout(text_column, 1)
         layout.addWidget(self.busy_progress)
+        layout.addWidget(self.cancel_button)
         return self.busy_panel
 
-    def _build_query_panel(self) -> QFrame:
+    def _build_upper_workspace_panel(self) -> QFrame:
         panel = QFrame()
-        panel.setObjectName("queryPanel")
+        panel.setObjectName("upperWorkspacePanel")
         layout = QHBoxLayout(panel)
-        layout.setContentsMargins(22, 18, 22, 18)
-        layout.setSpacing(14)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(18)
 
-        input_column = QVBoxLayout()
-        input_column.setSpacing(12)
+        # Left Column: Prompt Input
+        prompt_column = QVBoxLayout()
+        prompt_column.setSpacing(10)
 
-        label = QLabel("Nhập yêu cầu bằng tiếng Việt")
-        label.setObjectName("sectionTitle")
+        prompt_label = QLabel("Nhập câu hỏi / Yêu cầu")
+        prompt_label.setObjectName("sectionTitle")
+
         self.question_input.setObjectName("questionInput")
-        self.question_input.setPlaceholderText('Ví dụ: "Tính tổng lương của nhân viên phòng Kỹ thuật"')
+        self.question_input.setPlaceholderText("Hỏi trợ lý hoặc nhập câu hỏi (ví dụ: 'Tìm người dùng tên Tú'...)")
         self.question_input.setAccessibleName("Nhập yêu cầu bằng tiếng Việt")
-        self.question_input.setFixedHeight(94)
+        self.question_input.setFixedHeight(160)
+        self.question_input.returnPressed.connect(self._on_send_clicked)
 
-        actions = QHBoxLayout()
-        generate_button = QPushButton("Generate SQL")
-        generate_button.setObjectName("primaryButton")
-        copy_button = QPushButton("Copy")
-        copy_button.setObjectName("secondaryButton")
-        execute_button = QPushButton("Execute")
+        prompt_actions = QHBoxLayout()
+        send_button = QPushButton("Gửi yêu cầu")
+        send_button.setObjectName("primaryButton")
+        send_button.setMinimumHeight(38)
+        send_button.clicked.connect(self._on_send_clicked)
+        prompt_actions.addWidget(send_button)
+        prompt_actions.addStretch()
+
+        prompt_column.addWidget(prompt_label)
+        prompt_column.addWidget(self.question_input)
+        prompt_column.addLayout(prompt_actions)
+
+        # Right Column: SQL Editor
+        sql_column = QVBoxLayout()
+        sql_column.setSpacing(10)
+
+        sql_label = QLabel("SQL Editor (Câu lệnh SELECT)")
+        sql_label.setObjectName("sectionTitle")
+
+        self.sql_editor.setObjectName("sqlEditor")
+        self.sql_editor.setPlaceholderText("Câu lệnh SQL sẽ hiển thị hoặc chỉnh sửa tại đây...")
+        self.sql_editor.setAccessibleName("SQL Editor")
+        self.sql_editor.setFont(QFont("Courier New", 11))
+        self.sql_editor.setFixedHeight(160)
+
+        sql_actions = QHBoxLayout()
+        execute_button = QPushButton("Execute (Chạy)")
         execute_button.setObjectName("successButton")
+        show_results_button = QPushButton("Xem kết quả")
+        show_results_button.setObjectName("secondaryButton")
+        paste_button = QPushButton("Paste SQL")
+        paste_button.setObjectName("secondaryButton")
         bookmark_button = QPushButton("Bookmark")
         bookmark_button.setObjectName("warningButton")
 
-        generate_button.clicked.connect(lambda: self.generate_requested.emit(self.question_input.toPlainText().strip()))
-        copy_button.clicked.connect(self.copy_requested.emit)
         execute_button.clicked.connect(self.execute_requested.emit)
+        show_results_button.clicked.connect(self.show_results_requested.emit)
+        paste_button.clicked.connect(self.sql_editor.paste)
         bookmark_button.clicked.connect(self.bookmark_requested.emit)
 
-        for button in [generate_button, copy_button, execute_button, bookmark_button]:
+        for button in [execute_button, show_results_button, paste_button, bookmark_button]:
             button.setMinimumHeight(38)
-            actions.addWidget(button)
-        actions.addStretch()
+            sql_actions.addWidget(button)
+        sql_actions.addStretch()
 
-        input_column.addWidget(label)
-        input_column.addWidget(self.question_input)
-        input_column.addLayout(actions)
+        sql_column.addWidget(sql_label)
+        sql_column.addWidget(self.sql_editor)
+        sql_column.addLayout(sql_actions)
 
-        suggestions_panel = self._build_suggestions_panel()
-        suggestions_panel.setMinimumWidth(360)
-        suggestions_panel.setMaximumWidth(460)
-
-        layout.addLayout(input_column, 3)
-        layout.addWidget(suggestions_panel, 2)
+        layout.addLayout(prompt_column, 1)
+        layout.addLayout(sql_column, 1)
         return panel
 
-    def _build_suggestions_panel(self) -> QFrame:
-        panel = QFrame()
-        panel.setObjectName("suggestionsInlinePanel")
-        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 0, 0, 0)
-        layout.setSpacing(12)
-
-        title = QLabel("Suggested Queries")
-        title.setObjectName("sectionTitle")
-        self.suggested_queries.setObjectName("suggestedList")
-        self.suggested_queries.setAccessibleName("Suggested SQL queries")
-        layout.addWidget(title)
-        layout.addWidget(self.suggested_queries, 1)
-        return panel
-
-    def _build_results_panel(self) -> QFrame:
+    def _build_chat_panel(self) -> QFrame:
         panel = QFrame()
         panel.setObjectName("workspacePanel")
-        panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(18, 16, 18, 18)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(10)
 
-        header = QHBoxLayout()
-        title = QLabel("Query Results")
-        title.setObjectName("sectionTitle")
-        view_button = QPushButton("View as Table")
-        view_button.setObjectName("secondaryButton")
-        export_button = QPushButton("Export CSV")
-        export_button.setObjectName("secondaryButton")
-        export_button.clicked.connect(self.export_results_csv)
-        header.addWidget(title)
-        header.addStretch()
-        header.addWidget(view_button)
-        header.addWidget(export_button)
+        header_layout = QHBoxLayout()
+        chat_label = QLabel("Trợ lý CSDL & Tạo truy vấn")
+        chat_label.setObjectName("sectionTitle")
 
-        self.results_table.setObjectName("resultsTable")
-        self.results_table.setMinimumHeight(360)
-        self.results_table.setColumnCount(3)
-        self.results_table.setHorizontalHeaderLabels(["employee_id", "full_name", "department"])
-        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.results_table.verticalHeader().setVisible(False)
-        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.results_table.setAlternatingRowColors(True)
-        self.results_table.setAccessibleName("Query results")
+        clear_button = QPushButton("Xóa lịch sử")
+        clear_button.setObjectName("secondaryButton")
+        clear_button.setFixedWidth(110)
+        clear_button.clicked.connect(self.clear_chat_requested.emit)
 
-        layout.addLayout(header)
-        layout.addWidget(self.results_table, 1)
+        header_layout.addWidget(chat_label)
+        header_layout.addStretch()
+        header_layout.addWidget(clear_button)
+
+        self.chat_view.setObjectName("chatView")
+        self.chat_view.setUndoRedoEnabled(False)
+        self.chat_view.setAcceptRichText(True)
+        self.chat_view.setOpenExternalLinks(False)
+        self.chat_view.setOpenLinks(False)
+        self.chat_view.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse |
+            Qt.TextInteractionFlag.TextSelectableByKeyboard |
+            Qt.TextInteractionFlag.LinksAccessibleByMouse
+        )
+
+        layout.addLayout(header_layout)
+        layout.addWidget(self.chat_view, 1)
         return panel
+
+    def _on_send_clicked(self) -> None:
+        text = self.question_input.toPlainText().strip()
+        if not text:
+            return
+        self.generate_requested.emit(text)
 
     def set_schema(self, tables: list[TableInfo], annotations: dict[str, object] | None = None) -> None:
         self.schema_tree.set_schema(tables, annotations)
@@ -427,59 +439,91 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(title or "Ready")
 
     def set_generated_queries(self, queries: list[str]) -> None:
-        self.suggested_queries.clear()
-        self.suggested_queries.addItems(queries)
-
-    def set_query_results(self, columns: list[str], rows: list[list[object]]) -> None:
-        self.result_headers = columns
-        self.result_rows = rows
-        self.results_table.clear()
-        self.results_table.setColumnCount(len(columns))
-        self.results_table.setHorizontalHeaderLabels(columns)
-        self.results_table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            for column_index, value in enumerate(row):
-                self.results_table.setItem(row_index, column_index, QTableWidgetItem("" if value is None else str(value)))
-        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-
-    def export_results_csv(self) -> None:
-        from PySide6.QtWidgets import QMessageBox
-
-        if not self.result_headers:
-            QMessageBox.information(self, "Chưa có dữ liệu", "Không có Query Results để xuất CSV.")
-            return
-
-        file_path, _ = QFileDialog.getSaveFileName(self, "Export CSV", "query_results.csv", "CSV (*.csv)")
-        if not file_path:
-            return
-
-        try:
-            with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
-                writer = csv.writer(file)
-                writer.writerow(self.result_headers)
-                writer.writerows(self.result_rows)
-        except OSError as exc:
-            QMessageBox.warning(self, "Export CSV lỗi", str(exc))
-            return
-
-        self.statusBar().showMessage(f"Đã export CSV: {file_path}")
+        if queries:
+            self.sql_editor.setPlainText(queries[0])
+        else:
+            self.sql_editor.clear()
 
     def selected_query(self) -> str:
-        current = self.suggested_queries.currentItem()
-        if current is not None:
-            return current.text()
-        if self.suggested_queries.count() > 0:
-            return self.suggested_queries.item(0).text()
-        return ""
+        return self.sql_editor.toPlainText().strip()
 
     def set_question(self, question: str) -> None:
-        self.question_input.setPlainText(question)
+        self.question_input.setText(question)
         self.question_input.setFocus()
 
     def set_saved_query(self, question: str, sql: str) -> None:
         self.set_question(question)
         if sql:
-            self.set_generated_queries([sql])
+            self.sql_editor.setPlainText(sql)
+
+    def set_query_results(self, columns: list[str], rows: list[list[object]]) -> None:
+        self.results_dialog.set_results(columns, rows)
+        self.show_results_dialog()
+
+    def show_results_dialog(self) -> None:
+        self.results_dialog.show()
+        self.results_dialog.raise_()
+        self.results_dialog.activateWindow()
+
+    def export_results_csv(self) -> None:
+        self.results_dialog.export_csv()
+
+    def append_user_message(self, text: str) -> None:
+        html = (
+            f"<div style='margin: 6px 0; text-align: right;'>"
+            f"  <div style='display: inline-block; background-color: #dbeafe; color: #0f243f; "
+            f"              padding: 8px 12px; border-radius: 10px; max-width: 85%; text-align: left;'>"
+            f"    <b>Bạn:</b><br/>{text}"
+            f"  </div>"
+            f"</div>"
+        )
+        self.chat_view.append(html)
+        self._scroll_chat_to_bottom()
+
+    def append_assistant_message(self, text: str) -> None:
+        formatted_text = text.replace("\n", "<br/>")
+        html = (
+            f"<div style='margin: 6px 0; text-align: left;'>"
+            f"  <div style='display: inline-block; background-color: #ffffff; color: #182230; "
+            f"              border: 1px solid #d9e1ec; padding: 8px 12px; border-radius: 10px; max-width: 85%;'>"
+            f"    <b style='color: #135ba1;'>Trợ lý CSDL:</b><br/>{formatted_text}"
+            f"  </div>"
+            f"</div>"
+        )
+        self.chat_view.append(html)
+        self._scroll_chat_to_bottom()
+
+    def append_status(self, text: str) -> None:
+        html = (
+            f"<div id='assistantStatus' style='margin: 4px 0; text-align: left; color: #697789; font-style: italic;'>"
+            f"  {text}"
+            f"</div>"
+        )
+        self.chat_view.append(html)
+        self._scroll_chat_to_bottom()
+
+    def remove_status(self) -> None:
+        doc = self.chat_view.document()
+        html = doc.toHtml()
+        clean_html = html.replace("<div id=\"assistantStatus\"", "<div style=\"display:none;\"")
+        self.chat_view.setHtml(clean_html)
+        self._scroll_chat_to_bottom()
+
+    def clear_chat(self) -> None:
+        self.chat_view.clear()
+        welcome = (
+            f"<div style='background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; "
+            f"            padding: 10px; border-radius: 8px; margin-bottom: 8px;'>"
+            f"  <b>Xin chào!</b> Tôi là trợ lý CSDL.<br/>"
+            f"  Hãy hỏi tôi bất kỳ điều gì về cấu trúc bảng hoặc yêu cầu tạo truy vấn bằng tiếng Việt.<br/>"
+            f"  <i>(Ví dụ: 'Tìm tất cả tasks của Tú từ ngày 01/05/2026')</i>"
+            f"</div>"
+        )
+        self.chat_view.setHtml(welcome)
+
+    def _scroll_chat_to_bottom(self) -> None:
+        scrollbar = self.chat_view.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def _browse_model(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Chọn GGUF model", "", "GGUF models (*.gguf)")
@@ -509,46 +553,4 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def _load_placeholder_content(self) -> None:
-        self.suggested_queries.addItems(
-            [
-                "SELECT SUM(salary) FROM employees WHERE department = 'Kỹ thuật';",
-                "SELECT department, SUM(salary) FROM employees GROUP BY department;",
-                "SELECT AVG(salary) FROM employees WHERE department = 'Kỹ thuật';",
-            ]
-        )
-
-        rows = [
-            ("1", "Nguyen Van An", "Kỹ thuật"),
-            ("2", "Tran Thi Binh", "Kế toán"),
-            ("3", "Le Minh Chau", "Kỹ thuật"),
-        ]
-        self.set_query_results(["employee_id", "full_name", "department"], [list(row) for row in rows])
-
-        demo_tables = [
-            TableInfo(
-                name="employees",
-                columns=[
-                    ColumnInfo("employee_id", "int", False),
-                    ColumnInfo("full_name", "varchar", True),
-                    ColumnInfo("department_id", "int", True),
-                ],
-            )
-        ]
-        demo_annotations = {
-            "tables": {
-                "employees": {
-                    "description": "Nhân viên",
-                    "columns": {
-                        "employee_id": {"description": "Mã nhân viên", "unit": "", "note": "", "type": "int"},
-                        "full_name": {"description": "Họ tên", "unit": "", "note": "", "type": "varchar"},
-                        "department_id": {
-                            "description": "Phòng ban ID",
-                            "unit": "int",
-                            "note": "khóa ngoại",
-                            "type": "int",
-                        },
-                    },
-                }
-            }
-        }
-        self.set_schema(demo_tables, demo_annotations)
+        pass

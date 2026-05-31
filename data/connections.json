@@ -1,4 +1,15 @@
 {
-  "connections": [],
+  "connections": [
+    {
+      "name": "Demo",
+      "driver": "MYSQL",
+      "database": "healthassistant",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "jun",
+      "description": "Demo",
+      "extra": ""
+    }
+  ],
   "security_note": "Passwords are not stored here. Users enter credentials at login/test time."
 }

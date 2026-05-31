@@ -27,7 +27,7 @@ from sqlbot_desktop.views.assets import asset_path
 class LoginWindow(QMainWindow):
     """First screen for authenticating against a configured database."""
 
-    connect_requested = Signal(ConnectionProfile, str, str)
+    connect_requested = Signal(ConnectionProfile, str, str, bool)
     manage_connections_requested = Signal()
 
     def __init__(self) -> None:
@@ -228,6 +228,7 @@ class LoginWindow(QMainWindow):
         self.connect_button.setEnabled(has_profiles)
         if has_profiles:
             self.status_label.setText("Sẵn sàng kết nối.")
+            self._on_profile_changed()
         else:
             self.status_label.setText("Chưa có connection profile. Hãy mở Quản lý kết nối để tạo mới.")
 
@@ -235,11 +236,18 @@ class LoginWindow(QMainWindow):
         self.connect_button.clicked.connect(self._on_connect_clicked)
         self.settings_button.clicked.connect(self.manage_connections_requested.emit)
         self.connection_combo.currentIndexChanged.connect(self._on_profile_changed)
+        self.username_input.returnPressed.connect(self._on_connect_clicked)
+        self.password_input.returnPressed.connect(self._on_connect_clicked)
 
     def _on_profile_changed(self) -> None:
         profile = self.connection_combo.currentData()
-        if isinstance(profile, ConnectionProfile) and profile.username and not self.username_input.text():
-            self.username_input.setText(profile.username)
+        if isinstance(profile, ConnectionProfile):
+            if profile.username:
+                self.username_input.setText(profile.username)
+                self.remember_user_checkbox.setChecked(True)
+            else:
+                self.username_input.clear()
+                self.remember_user_checkbox.setChecked(False)
 
     def _on_connect_clicked(self) -> None:
         profile = self.connection_combo.currentData()
@@ -254,4 +262,4 @@ class LoginWindow(QMainWindow):
             return
 
         self.status_label.setText(f"Đang kết nối tới {profile.name}...")
-        self.connect_requested.emit(profile, username, password)
+        self.connect_requested.emit(profile, username, password, self.remember_user_checkbox.isChecked())

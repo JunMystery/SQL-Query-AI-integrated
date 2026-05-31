@@ -1,4 +1,4 @@
-"""Service tests for the local GGUF sidecar integration."""
+"""Service tests for the local GGUF direct in-process integration and cancellation."""
 
 from __future__ import annotations
 
@@ -6,22 +6,14 @@ import sys
 import unittest
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig  # noqa: E402
 from sqlbot_desktop.services.ai_engine import AIEngine  # noqa: E402
-from sqlbot_desktop.services.llm_sidecar import LlmSidecar  # noqa: E402
 
 
-class LlmSidecarTests(unittest.TestCase):
-    def test_find_free_port(self) -> None:
-        port = LlmSidecar()._find_free_port()
-
-        self.assertIsInstance(port, int)
-        self.assertGreater(port, 0)
-
+class AIEngineTests(unittest.TestCase):
     def test_rejects_non_gguf_model(self) -> None:
         result = AIEngine().load(AIModelConfig(backend=AIBackend.LOCAL, local_model_path="model.bin"))
 
@@ -42,18 +34,16 @@ class LlmSidecarTests(unittest.TestCase):
 
         self.assertFalse(engine.is_loaded)
 
-    def test_start_sidecar_health_when_published(self) -> None:
-        sidecar = LlmSidecar()
-        executable = sidecar._sidecar_executable()
-        if not executable.exists():
-            self.skipTest(f"LLM host is not published: {executable}")
-
-        try:
-            response = sidecar.ensure_running()
-            self.assertTrue(response.ok, response.message)
-            self.assertTrue(sidecar.health().ok)
-        finally:
-            sidecar.stop()
+    def test_cancellation_during_generation(self) -> None:
+        engine = AIEngine()
+        # Mock being loaded for testing cancellation logic
+        engine.config = AIModelConfig(backend=AIBackend.API, api_endpoint="http://dummy", api_model="dummy")
+        
+        # Test generation with an immediate cancel callback
+        result = engine.generate("Lấy danh sách tất cả nhân viên", check_cancelled=lambda: True)
+        
+        self.assertFalse(result.ok)
+        self.assertIn("hủy", result.message.lower())
 
 
 if __name__ == "__main__":

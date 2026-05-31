@@ -252,5 +252,45 @@ class ConnectionFormDialog(QDialog):
             QMessageBox.warning(self, "Thiếu thông tin", error)
             return
 
-        self.saved_profile = self.profile()
+        profile = self.profile()
+        username = self.username_input.text().strip()
+        password = self.password_input.text()
+
+        # Connect to DB to extract schema and save annotations automatically on save
+        result = self.database_manager.open_connection(profile, username, password)
+        if result.ok:
+            try:
+                tables = SchemaExtractor(self.database_manager.database(result.connection_name)).get_all_tables_columns()
+                from sqlbot_desktop.infrastructure.annotation_repository import AnnotationRepository
+                repo = AnnotationRepository()
+                
+                # Merge with existing annotations to preserve user modifications
+                existing = repo.load(profile.name)
+                empty_annot = repo.empty_for_schema(profile.name, tables)
+                
+                for table_name, table_data in empty_annot["tables"].items():
+                    existing_table = existing.get("tables", {}).get(table_name, {})
+                    if existing_table:
+                        if existing_table.get("description"):
+                            table_data["description"] = existing_table["description"]
+                        for col_name, col_data in table_data["columns"].items():
+                            existing_col = existing_table.get("columns", {}).get(col_name, {})
+                            if existing_col:
+                                for key in ("description", "unit", "note"):
+                                    if existing_col.get(key):
+                                        col_data[key] = existing_col[key]
+                
+                repo.save(profile.name, empty_annot)
+            except Exception as exc:
+                print(f"Warning: Failed to save schema annotations: {exc}")
+            finally:
+                self.database_manager.close_connection(result.connection_name)
+        else:
+            QMessageBox.warning(
+                self,
+                "Kết nối thất bại",
+                f"Không thể kết nối CSDL để tạo Schema Annotation: {result.message}\nProfile vẫn sẽ được lưu."
+            )
+
+        self.saved_profile = profile
         self.accept()

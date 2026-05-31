@@ -1,7 +1,7 @@
 * {
     color: #182230;
-    selection-background-color: #dbeafe;
-    selection-color: #0f243f;
+    selection-background-color: #0f62fe;
+    selection-color: #ffffff;
 }
 
 QMainWindow,
@@ -153,13 +153,13 @@ QLabel#appName {
 
 QLabel#mainTitle {
     color: #101828;
-    font-size: 26px;
+    font-size: 20px;
     font-weight: 800;
 }
 
 QLabel#mainSubtitle {
     color: #586579;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 QLabel#connectionBadge {
@@ -293,7 +293,8 @@ QLineEdit#fieldInput {
 QLineEdit,
 QComboBox,
 QSpinBox,
-QTextEdit {
+QTextEdit,
+QTextBrowser {
     background: #ffffff;
     border: 1px solid #b9c6d8;
     border-radius: 7px;
@@ -305,7 +306,8 @@ QTextEdit {
 QLineEdit:disabled,
 QComboBox:disabled,
 QSpinBox:disabled,
-QTextEdit:disabled {
+QTextEdit:disabled,
+QTextBrowser:disabled {
     background: #eef2f7;
     border-color: #d2dbe8;
     color: #697789;

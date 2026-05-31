@@ -35,7 +35,31 @@ class LoginController:
     def refresh_profiles(self) -> None:
         self.view.set_profiles(self.repository.load_profiles())
 
-    def connect(self, profile: ConnectionProfile, username: str, password: str) -> None:
+    def connect(self, profile: ConnectionProfile, username: str, password: str, remember_username: bool) -> None:
+        # Save or clear the username in the connection configuration
+        profiles = self.repository.load_profiles()
+        updated = False
+        for idx, p in enumerate(profiles):
+            if p.name == profile.name:
+                target_user = username if remember_username else ""
+                if p.username != target_user:
+                    profiles[idx] = ConnectionProfile(
+                        name=p.name,
+                        driver=p.driver,
+                        database=p.database,
+                        host=p.host,
+                        port=p.port,
+                        username=target_user,
+                        description=p.description,
+                        extra=p.extra
+                    )
+                    updated = True
+                break
+
+        if updated:
+            self.repository.save_profiles(profiles)
+            self.refresh_profiles()
+
         result = self.database_manager.open_connection(profile, username, password)
         if not result.ok:
             self.view.set_status(result.message)
@@ -43,7 +67,7 @@ class LoginController:
             return
 
         self.view.set_status(f"Đã kết nối: {profile.name}")
-        QMessageBox.information(self.view, "Kết nối thành công", "Phiên kết nối đã sẵn sàng cho Main Window.")
+
         self.main_controller = MainController(profile, self.database_manager, result.connection_name)
         self.main_controller.show()
         self.view.hide()

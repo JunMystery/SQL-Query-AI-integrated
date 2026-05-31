@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 
 block_cipher = None
@@ -10,8 +10,10 @@ project_root = Path(SPECPATH)
 datas = [
     (str(project_root / "resources"), "resources"),
 ]
+datas += collect_data_files("llama_cpp")
 
 binaries = []
+binaries += collect_dynamic_libs("llama_cpp")
 from PySide6.QtCore import QLibraryInfo
 
 pyside_plugins = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath))
@@ -29,6 +31,7 @@ hiddenimports = [
     "pymysql",
     "psycopg",
     "psycopg_binary",
+    "llama_cpp",
 ]
 hiddenimports += collect_submodules("sqlbot_desktop")
 hiddenimports += collect_submodules("pymysql")

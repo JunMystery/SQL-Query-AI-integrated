@@ -58,53 +58,25 @@ Get-CimInstance Win32_Process |
 
 
 def publish_llm_host(skip: bool = False) -> None:
-    if skip:
-        print("skip: dotnet publish llm_host/SQLBot.LlmHost")
-        return
-    if not dotnet_has_sdk():
-        raise RuntimeError("Không tìm thấy .NET SDK. Cài .NET 8 SDK để build SQLBot.LlmHost.exe.")
-    run(
-        [
-            "dotnet",
-            "publish",
-            "llm_host/SQLBot.LlmHost/SQLBot.LlmHost.csproj",
-            "-c",
-            "Release",
-            "-r",
-            "win-x64",
-            "--self-contained",
-            "true",
-            "-p:PublishSingleFile=false",
-            "-o",
-            "dist/llm_host",
-        ]
-    )
+    pass
 
 
 def copy_llm_host() -> None:
-    source = PROJECT_ROOT / "dist" / "llm_host"
-    target = PROJECT_ROOT / "dist" / "SQLBot" / "_internal" / "runtime" / "llm_host"
-    if not source.exists():
-        raise FileNotFoundError(f"Không tìm thấy LLM host publish output: {source}")
-    if target.exists():
-        shutil.rmtree(target)
-    shutil.copytree(source, target)
-    print(f"copied LLM host -> {target}")
+    pass
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build SQLBot Desktop EXE.")
     parser.add_argument("--skip-install", action="store_true", help="Do not install requirements before building.")
     parser.add_argument("--skip-pyinstaller", action="store_true", help="Run checks/post-build scripts without rebuilding.")
-    parser.add_argument("--skip-llm-host", action="store_true", help="Do not publish/copy the C# LLamaSharp sidecar.")
+    parser.add_argument("--skip-llm-host", action="store_true", help="Do not publish/copy the C# LLamaSharp sidecar (Deprecated).")
     args = parser.parse_args()
 
     python = sys.executable
     if not args.skip_install:
-        run([python, "-m", "pip", "install", "-r", "requirements.txt"])
+        run([python, "-m", "pip", "install", "-r", "requirements.txt", "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cpu"])
 
     run([python, "scripts/check_sql_drivers.py"])
-    publish_llm_host(skip=args.skip_llm_host)
     if not args.skip_pyinstaller:
         stop_running_packaged_app()
     run(
@@ -112,9 +84,6 @@ def main() -> int:
         skip=args.skip_pyinstaller,
     )
     run([python, "scripts/post_build_sql_drivers.py", "dist/SQLBot"])
-    if not args.skip_llm_host:
-        copy_llm_host()
-        run([python, "scripts/verify_llm_host.py", "dist/SQLBot"])
     run([python, "scripts/verify_packaged_drivers.py", "dist/SQLBot"])
 
     print()

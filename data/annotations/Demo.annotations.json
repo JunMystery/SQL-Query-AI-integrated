@@ -1,0 +1,1039 @@
+{
+  "connection_name": "Demo",
+  "tables": {
+    "biometricreadings": {
+      "description": "",
+      "columns": {
+        "reading_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "INTEGER"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "recorded_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "data_type": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(20)"
+        },
+        "value": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "FLOAT"
+        },
+        "unit": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(10)"
+        },
+        "source": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(100)"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "chathistory": {
+      "description": "",
+      "columns": {
+        "chat_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "session_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(100)"
+        },
+        "role": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(10)"
+        },
+        "message": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "tokens_used": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "INTEGER"
+        },
+        "ai_model": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(50)"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "chatsessions": {
+      "description": "",
+      "columns": {
+        "session_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(100)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "title": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "session_hash": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(64)"
+        },
+        "message_count": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "INTEGER"
+        },
+        "last_message_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "diseases": {
+      "description": "",
+      "columns": {
+        "disease_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(8)"
+        },
+        "name_vi": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "name_vi_unaccented": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "name_en": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "category": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(50)"
+        },
+        "source_slug": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "source_file": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "diagnostic_symptoms": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "diagnostic_symptoms_en": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "medications": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "medications_en": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "medical_procedures": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "medical_procedures_en": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "prevention_and_lifestyle": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "prevention_and_lifestyle_en": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "contraindications_and_warnings": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "contraindications_and_warnings_en": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "habitcompletions": {
+      "description": "",
+      "columns": {
+        "completion_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "habit_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "completion_date": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATE"
+        },
+        "completed_value": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DECIMAL(10, 2)"
+        },
+        "is_achieved": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TINYINT"
+        },
+        "notes": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "metadata_json": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "LONGTEXT"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "habits": {
+      "description": "",
+      "columns": {
+        "habit_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "name": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(200)"
+        },
+        "description": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "habit_type": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(50)"
+        },
+        "checkin_type": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(32)"
+        },
+        "frequency_type": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(20)"
+        },
+        "frequency_value": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "INTEGER"
+        },
+        "target_value": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DECIMAL(10, 2)"
+        },
+        "unit": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(20)"
+        },
+        "reminder_start_time": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TIME"
+        },
+        "reminder_end_time": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TIME"
+        },
+        "reminder_interval": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TIME"
+        },
+        "reminder_mode": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(20)"
+        },
+        "is_active": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TINYINT"
+        },
+        "start_date": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATE"
+        },
+        "end_date": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATE"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "hcdailysnapshots": {
+      "description": "",
+      "columns": {
+        "snapshot_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "INTEGER"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "snapshot_date": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(10)"
+        },
+        "snapshot_data": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "refreshtokens": {
+      "description": "",
+      "columns": {
+        "token_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "token_hash": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "CHAR(64)"
+        },
+        "device_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(64)"
+        },
+        "user_agent": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "issued_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "expires_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "last_used_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "revoked_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "replaced_by_token_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        }
+      }
+    },
+    "syncappliedmutations": {
+      "description": "",
+      "columns": {
+        "mutation_row_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "device_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(128)"
+        },
+        "mutation_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(64)"
+        },
+        "applied_change_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "result_json": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "syncchangelog": {
+      "description": "",
+      "columns": {
+        "change_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "entity_type": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(40)"
+        },
+        "entity_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(120)"
+        },
+        "operation": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(12)"
+        },
+        "changed_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "source_device_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(128)"
+        },
+        "mutation_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(64)"
+        },
+        "entity_updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "syncclients": {
+      "description": "",
+      "columns": {
+        "client_row_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "device_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(128)"
+        },
+        "last_ack_cursor": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "last_seen_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "status": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(32)"
+        }
+      }
+    },
+    "synctombstones": {
+      "description": "",
+      "columns": {
+        "tombstone_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "entity_type": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(40)"
+        },
+        "entity_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(120)"
+        },
+        "deleted_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "change_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "BIGINT"
+        },
+        "source_device_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(128)"
+        }
+      }
+    },
+    "tasks": {
+      "description": "",
+      "columns": {
+        "task_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "title": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(200)"
+        },
+        "description": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "start_time": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "end_time": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "priority": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(20)"
+        },
+        "notification_minutes_before": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "INTEGER"
+        },
+        "task_reminder_mode": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(24)"
+        },
+        "reminder_window_start": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TIME"
+        },
+        "reminder_window_end": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TIME"
+        },
+        "reminder_interval": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TIME"
+        },
+        "color_tag": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(7)"
+        },
+        "is_completed": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TINYINT"
+        },
+        "completed_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "is_recurring": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TINYINT"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "userdiseases": {
+      "description": "",
+      "columns": {
+        "id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "disease_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(8)"
+        },
+        "status": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(50)"
+        },
+        "note": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        }
+      }
+    },
+    "userhealthinfo": {
+      "description": "",
+      "columns": {
+        "health_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(36)"
+        },
+        "user_id": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "birth_date": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "gender": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "height_cm": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "weight_kg": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "health_goals": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "occupation": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    },
+    "users": {
+      "description": "Bảng người dùng",
+      "columns": {
+        "user_id": {
+          "description": "ID người dùng",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(16)"
+        },
+        "email": {
+          "description": "Email người dùng",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(100)"
+        },
+        "password_hash": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "VARCHAR(255)"
+        },
+        "full_name": {
+          "description": "Họ và tên",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "phone": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "avatar_url": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "TEXT"
+        },
+        "is_active": {
+          "description": "Trạng thái hoạt động",
+          "unit": "",
+          "note": "",
+          "type": "TINYINT"
+        },
+        "created_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "updated_at": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        },
+        "last_login": {
+          "description": "",
+          "unit": "",
+          "note": "",
+          "type": "DATETIME"
+        }
+      }
+    }
+  }
+}

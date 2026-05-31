@@ -74,6 +74,9 @@ class AIModelConfig:
     local_model_path: str = ""
     api_endpoint: str = ""
     api_model: str = ""
+    context_size: int = 4096
+    max_tokens: int = 512
+    threads: int = 4
 
 
 @dataclass(frozen=True)
