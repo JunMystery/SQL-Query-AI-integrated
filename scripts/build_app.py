@@ -75,6 +75,8 @@ def main() -> int:
     python = sys.executable
     if not args.skip_install:
         run([python, "-m", "pip", "install", "-r", "requirements.txt", "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cpu"])
+        if (PROJECT_ROOT / "requirements-db.txt").exists():
+            run([python, "-m", "pip", "install", "-r", "requirements-db.txt"])
 
     run([python, "scripts/check_sql_drivers.py"])
     if not args.skip_pyinstaller:
