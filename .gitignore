@@ -1,0 +1,19 @@
+
+# AI Agent Coding Standards
+AI-Agent-Standards/
+AGENTS.md
+
+# AI Agent Coding Standards
+GEMINI.md
+
+/AI Models/
+/__pycache__/
+__pycache__/
+*.py[cod]
+.venv/
+.env
+/build/
+/dist/
+/data/security/
+**/__init__.py
+*.log
