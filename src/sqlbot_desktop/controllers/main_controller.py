@@ -41,6 +41,7 @@ from sqlbot_desktop.infrastructure.schema_extractor import SchemaExtractor
 
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ConnectionProfile, GenerationResult
+from sqlbot_desktop.infrastructure.ai_settings_repository import AISettingsRepository
 
 
 from sqlbot_desktop.services.ai_engine import AIEngine
@@ -257,12 +258,15 @@ class MainController:
         self.task_receiver: TaskReceiver | None = None
 
 
+        self.ai_settings_repository = AISettingsRepository()
         self.ai_engine = AIEngine()
         self.text_to_sql_pipeline = TextToSqlPipeline(self.ai_engine, query_logger=QueryLogger())
 
 
         self.view = MainWindow()
-
+        stored_config = self.ai_settings_repository.load_config()
+        self.view.set_ai_model_config(stored_config)
+        self._apply_cpu_limit(stored_config)
 
         self.view.set_connection(profile)
 
@@ -298,6 +302,11 @@ class MainController:
 
 
         self.view.settings_requested.connect(self.open_settings)
+
+        # Connect Visual Query Builder action signals
+        self.view.visual_builder.execute_requested.connect(self.execute_query)
+        self.view.visual_builder.show_results_requested.connect(self.view.show_results_dialog)
+        self.view.visual_builder.bookmark_requested.connect(self.add_bookmark)
 
 
         self.view.refresh_samples_requested.connect(self.refresh_sample_values)
@@ -696,23 +705,18 @@ class MainController:
 
 
     def open_settings(self) -> None:
-
-
         dialog = AISettingsDialog(self.view.ai_model_config(), self.view)
-
+        dialog.load_model_requested.connect(self.load_model)
+        dialog.unload_model_requested.connect(self.unload_model)
 
         if dialog.exec() != dialog.DialogCode.Accepted:
-
-
             return
-
 
         config = dialog.config()
         self.view.set_ai_model_config(config)
         self._apply_cpu_limit(config)
-
-
-        self.view.statusBar().showMessage("Đã cập nhật AI settings. Bấm Load để áp dụng.")
+        self.ai_settings_repository.save_config(config)
+        self.view.statusBar().showMessage("Đã lưu AI settings.")
 
 
 

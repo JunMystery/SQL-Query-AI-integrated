@@ -6,12 +6,13 @@ import ctypes
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -28,6 +29,9 @@ from sqlbot_desktop.models.entities import AIBackend, AIModelConfig
 class AISettingsDialog(QDialog):
     """Configure the active AI backend without loading it automatically."""
 
+    load_model_requested = Signal(AIModelConfig)
+    unload_model_requested = Signal()
+
     def __init__(self, config: AIModelConfig, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("AI Settings")
@@ -38,6 +42,7 @@ class AISettingsDialog(QDialog):
         self.model_path_input = QLineEdit()
         self.api_endpoint_input = QLineEdit()
         self.api_model_input = QLineEdit()
+        self.api_key_input = QLineEdit()
         self.context_size_spin = QSpinBox()
         self.max_tokens_spin = QSpinBox()
         self.threads_spin = QSpinBox()
@@ -74,6 +79,7 @@ class AISettingsDialog(QDialog):
             gpu_layers=self.gpu_layers_spin.value(),
             cpu_thread_limit=self.cpu_limit_spin.value(),
             self_correction_retries=self.self_correction_spin.value(),
+            api_key=self.api_key_input.text().strip(),
         )
 
     def set_config(self, config: AIModelConfig) -> None:
@@ -82,6 +88,7 @@ class AISettingsDialog(QDialog):
         self.model_path_input.setText(config.local_model_path)
         self.api_endpoint_input.setText(config.api_endpoint)
         self.api_model_input.setText(config.api_model)
+        self.api_key_input.setText(getattr(config, "api_key", ""))
         self.context_size_spin.setValue(config.context_size or 2048)
         self.max_tokens_spin.setValue(config.max_tokens or 512)
         self.threads_spin.setValue(config.threads or 2)
@@ -119,7 +126,7 @@ class AISettingsDialog(QDialog):
         # Token Manager Section
         token_panel = QFrame()
         token_panel.setObjectName("settingsPanel")
-        token_layout = QHBoxLayout(token_panel)
+        token_layout = QGridLayout(token_panel)
         token_layout.setSpacing(14)
 
         self.context_size_spin.setRange(256, 32768)
@@ -167,18 +174,18 @@ class AISettingsDialog(QDialog):
         self.gpu_layers_spin.setValue(0)
         self.gpu_layers_spin.setAccessibleName("GPU offload layers")
 
-        token_layout.addWidget(QLabel("Context Size (n_ctx)"))
-        token_layout.addWidget(self.context_size_spin, 1)
-        token_layout.addWidget(QLabel("Max Tokens (max_tokens)"))
-        token_layout.addWidget(self.max_tokens_spin, 1)
-        token_layout.addWidget(self.threads_label)
-        token_layout.addWidget(self.threads_spin, 1)
-        token_layout.addWidget(QLabel("CPU Limit"))
-        token_layout.addWidget(self.cpu_limit_spin, 1)
-        token_layout.addWidget(QLabel("Self-Correct"))
-        token_layout.addWidget(self.self_correction_spin, 1)
-        token_layout.addWidget(QLabel("GPU Layers"))
-        token_layout.addWidget(self.gpu_layers_spin, 1)
+        token_layout.addWidget(QLabel("Context Size (n_ctx)"), 0, 0)
+        token_layout.addWidget(self.context_size_spin, 0, 1)
+        token_layout.addWidget(QLabel("Max Tokens (max_tokens)"), 0, 2)
+        token_layout.addWidget(self.max_tokens_spin, 0, 3)
+        token_layout.addWidget(self.threads_label, 0, 4)
+        token_layout.addWidget(self.threads_spin, 0, 5)
+        token_layout.addWidget(QLabel("CPU Limit"), 1, 0)
+        token_layout.addWidget(self.cpu_limit_spin, 1, 1)
+        token_layout.addWidget(QLabel("Self-Correct"), 1, 2)
+        token_layout.addWidget(self.self_correction_spin, 1, 3)
+        token_layout.addWidget(QLabel("GPU Layers"), 1, 4)
+        token_layout.addWidget(self.gpu_layers_spin, 1, 5)
 
         layout.addWidget(token_panel)
         self.threads_hint.setObjectName("formHint")
@@ -193,15 +200,25 @@ class AISettingsDialog(QDialog):
         actions = QHBoxLayout()
         test_button = QPushButton("Test Inference")
         test_button.setObjectName("secondaryButton")
+        load_button = QPushButton("Load Model")
+        load_button.setObjectName("successButton")
+        unload_button = QPushButton("Unload Model")
+        unload_button.setObjectName("dangerButton")
         save_button = QPushButton("Save")
         save_button.setObjectName("primaryButton")
         cancel_button = QPushButton("Cancel")
         cancel_button.setObjectName("secondaryButton")
+
         test_button.clicked.connect(self._test_settings)
+        load_button.clicked.connect(self._request_load)
+        unload_button.clicked.connect(self._request_unload)
         save_button.clicked.connect(self._accept_if_valid)
         cancel_button.clicked.connect(self.reject)
+
         actions.addWidget(test_button)
         actions.addStretch()
+        actions.addWidget(load_button)
+        actions.addWidget(unload_button)
         actions.addWidget(cancel_button)
         actions.addWidget(save_button)
         layout.addLayout(actions)
@@ -243,14 +260,15 @@ class AISettingsDialog(QDialog):
 
         self.api_endpoint_input.setPlaceholderText("https://api.openai.com/v1/chat/completions")
         self.api_model_input.setPlaceholderText("API model, ví dụ gpt-4.1-mini")
+        self.api_key_input.setPlaceholderText("API Key (Có thể bỏ trống)")
+        self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+
         layout.addWidget(QLabel("API endpoint"))
         layout.addWidget(self.api_endpoint_input)
         layout.addWidget(QLabel("API model"))
         layout.addWidget(self.api_model_input)
-
-        hint = QLabel("API key đọc từ biến môi trường SQLBOT_AI_API_KEY.")
-        hint.setObjectName("formHint")
-        layout.addWidget(hint)
+        layout.addWidget(QLabel("API Key"))
+        layout.addWidget(self.api_key_input)
 
     def _load_models(self) -> None:
         current_path = self.model_path_input.text().strip()
@@ -365,14 +383,14 @@ class AISettingsDialog(QDialog):
                 self.test_output.setPlainText("Local GGUF chưa hợp lệ.")
                 return
             self.test_output.setPlainText(
-                "Local GGUF hợp lệ. Bấm Load ở Main Window để load model, sau đó dùng Generate SQL để test inference."
+                "Local GGUF hợp lệ. Bấm Load Model để load model, sau đó dùng Generate SQL để test inference."
             )
             return
 
         if not config.api_endpoint.strip() or not config.api_model.strip():
             self.test_output.setPlainText("API endpoint và API model là bắt buộc.")
             return
-        self.test_output.setPlainText("API settings hợp lệ. API key sẽ được đọc từ SQLBOT_AI_API_KEY.")
+        self.test_output.setPlainText("API settings hợp lệ. Bấm Load Model để chọn API model.")
 
     def _accept_if_valid(self) -> None:
         config = self.config()
@@ -385,3 +403,9 @@ class AISettingsDialog(QDialog):
             QMessageBox.warning(self, "API chưa đủ", "Vui lòng nhập API endpoint và API model.")
             return
         self.accept()
+
+    def _request_load(self) -> None:
+        self.load_model_requested.emit(self.config())
+
+    def _request_unload(self) -> None:
+        self.unload_model_requested.emit()

@@ -49,6 +49,12 @@ class AISettingsDialogTests(unittest.TestCase):
         self.assertEqual(dialog.self_correction_spin.value(), 5)
         self.assertEqual(dialog.config().self_correction_retries, 5)
 
+    def test_api_key_round_trip(self) -> None:
+        dialog = AISettingsDialog(AIModelConfig(backend=AIBackend.API, api_key="secret-token-123"))
+
+        self.assertEqual(dialog.api_key_input.text(), "secret-token-123")
+        self.assertEqual(dialog.config().api_key, "secret-token-123")
+
 
 if __name__ == "__main__":
     unittest.main()

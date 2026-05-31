@@ -102,6 +102,7 @@ class AIModelConfig:
     gpu_layers: int = 0
     cpu_thread_limit: int = 4
     self_correction_retries: int = 3
+    api_key: str = ""
 
 
 

@@ -169,8 +169,6 @@ class AIEngine:
             return GenerationResult(False, message="Vui lòng nhập API endpoint.")
         if not config.api_model.strip():
             return GenerationResult(False, message="Vui lòng nhập API model.")
-        if not os.environ.get(self.API_KEY_ENV):
-            return GenerationResult(False, message=f"Chưa cấu hình biến môi trường {self.API_KEY_ENV}.")
         self.config = config
         return GenerationResult(True, message=f"Đã chọn API model: {config.api_model}")
 
@@ -229,13 +227,15 @@ class AIEngine:
         check_cancelled: Callable[[], bool] | None = None,
     ) -> dict:
         assert self.config is not None
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
         request = urllib.request.Request(
             self.config.api_endpoint,
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {os.environ[self.API_KEY_ENV]}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
             method="POST",
         )
         try:

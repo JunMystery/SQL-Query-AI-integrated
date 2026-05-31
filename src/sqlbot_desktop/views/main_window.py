@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QSizePolicy,
+    QStackedWidget,
     QStatusBar,
     QTableWidget,
     QTableWidgetItem,
@@ -37,6 +38,7 @@ from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ColumnInfo,
 from sqlbot_desktop.services.app_config import AppConfig
 from sqlbot_desktop.views.assets import asset_path
 from sqlbot_desktop.views.components.schema_tree_widget import SchemaTreeWidget
+from sqlbot_desktop.views.components.visual_query_builder import VisualQueryBuilderPanel
 from sqlbot_desktop.views.dialogs.query_results_dialog import QueryResultsDialog
 
 
@@ -107,6 +109,9 @@ class MainWindow(QMainWindow):
         self._gpu_layers = 0
         self._cpu_thread_limit = 4
         self._self_correction_retries = AppConfig.load().self_correction.max_retries
+        self._ai_config = AIModelConfig(backend=AIBackend.LOCAL)
+        self._tables = []
+        self._annotations = {}
 
         self._build_menu()
         self._build_ui()
@@ -150,10 +155,24 @@ class MainWindow(QMainWindow):
         root_layout.setSpacing(10)
 
         root_layout.addLayout(self._build_header())
-        root_layout.addWidget(self._build_ai_panel())
         root_layout.addWidget(self._build_busy_panel())
-        root_layout.addWidget(self._build_upper_workspace_panel())
-        root_layout.addWidget(self._build_chat_panel(), 1)
+
+        # Page 0: Chat Mode Layout
+        chat_page = QWidget()
+        chat_page_layout = QVBoxLayout(chat_page)
+        chat_page_layout.setContentsMargins(0, 0, 0, 0)
+        chat_page_layout.setSpacing(10)
+        chat_page_layout.addWidget(self._build_upper_workspace_panel())
+        chat_page_layout.addWidget(self._build_chat_panel(), 1)
+
+        # Page 1: Visual Query Builder Mode Layout
+        self.visual_builder = VisualQueryBuilderPanel(self)
+
+        # Stack
+        self.workspace_stack = QStackedWidget()
+        self.workspace_stack.addWidget(chat_page)
+        self.workspace_stack.addWidget(self.visual_builder)
+        root_layout.addWidget(self.workspace_stack, 1)
 
         self.setCentralWidget(root)
 
@@ -169,13 +188,27 @@ class MainWindow(QMainWindow):
         title_group.addWidget(title)
         title_group.addWidget(subtitle)
 
-        self.connection_label.setObjectName("connectionBadge")
-        self.connection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.connection_label.setMinimumWidth(120)
-        self.connection_label.setMaximumWidth(200)
+        # Mode switch button on the far right of the header
+        self.mode_switch_btn = QPushButton("Tự Build Query 🛠️")
+        self.mode_switch_btn.clicked.connect(self._toggle_workspace_mode)
+        self.mode_switch_btn.setMinimumHeight(38)
+        self.mode_switch_btn.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4f46e5, stop:1 #7c3aed);
+                color: white;
+                border-radius: 19px;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 0 16px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4338ca, stop:1 #6d28d9);
+            }
+        """)
 
         header.addLayout(title_group, 1)
-        header.addWidget(self.connection_label)
+        header.addWidget(self.mode_switch_btn)
         return header
 
     def _build_schema_dock(self) -> None:
@@ -203,61 +236,7 @@ class MainWindow(QMainWindow):
         self.schema_dock = dock
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
 
-    def _build_ai_panel(self) -> QFrame:
-        panel = QFrame()
-        panel.setObjectName("aiPanel")
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(10)
 
-        title_row = QHBoxLayout()
-        title = QLabel("AI Engine")
-        title.setObjectName("sectionTitle")
-        self.model_status_label.setObjectName("modelStatusBadge")
-        title_row.addWidget(title)
-        title_row.addStretch()
-        title_row.addWidget(self.model_status_label)
-        layout.addLayout(title_row)
-
-        controls = QHBoxLayout()
-        controls.setSpacing(10)
-
-        self.backend_combo.addItem("Local GGUF", AIBackend.LOCAL.value)
-        self.backend_combo.addItem("API AI", AIBackend.API.value)
-        self.backend_combo.setAccessibleName("AI backend")
-        self.backend_combo.currentIndexChanged.connect(self._sync_ai_controls)
-
-        self.model_path_input.setPlaceholderText("Chọn file .gguf")
-        self.model_path_input.setAccessibleName("Local GGUF model path")
-        self.browse_model_button.setObjectName("secondaryButton")
-        self.browse_model_button.clicked.connect(self._browse_model)
-
-        self.api_endpoint_input.setPlaceholderText("API endpoint, ví dụ https://api.openai.com/v1/chat/completions")
-        self.api_endpoint_input.setAccessibleName("API endpoint")
-        self.api_model_input.setPlaceholderText("API model")
-        self.api_model_input.setAccessibleName("API model")
-
-        load_button = QPushButton("Load")
-        load_button.setObjectName("successButton")
-        unload_button = QPushButton("Unload")
-        unload_button.setObjectName("dangerButton")
-        load_button.clicked.connect(lambda: self.load_model_requested.emit(self.ai_model_config()))
-        unload_button.clicked.connect(self.unload_model_requested.emit)
-
-        controls.addWidget(self.backend_combo)
-        controls.addWidget(self.model_path_input, 2)
-        controls.addWidget(self.browse_model_button)
-        controls.addWidget(self.api_endpoint_input, 2)
-        controls.addWidget(self.api_model_input)
-        controls.addWidget(load_button)
-        controls.addWidget(unload_button)
-        layout.addLayout(controls)
-
-        api_hint = QLabel("API key đọc từ biến môi trường SQLBOT_AI_API_KEY, không nhập hoặc lưu trong UI.")
-        api_hint.setObjectName("formHint")
-        layout.addWidget(api_hint)
-        self._sync_ai_controls()
-        return panel
 
     def _build_busy_panel(self) -> QFrame:
         self.busy_panel.setObjectName("busyPanel")
@@ -413,7 +392,10 @@ class MainWindow(QMainWindow):
         self.generate_requested.emit(text)
 
     def set_schema(self, tables: list[TableInfo], annotations: dict[str, object] | None = None) -> None:
+        self._tables = tables
+        self._annotations = annotations or {}
         self.schema_tree.set_schema(tables, annotations)
+        self.visual_builder.set_schema(tables, annotations)
         table_count = len(tables)
         column_count = sum(len(table.columns) for table in tables)
         self.schema_summary_label.setText(f"{table_count} tables, {column_count} columns")
@@ -427,37 +409,19 @@ class MainWindow(QMainWindow):
     def _build_status_bar(self) -> None:
         status = QStatusBar()
         status.showMessage("Ready")
+        self.connection_label.setObjectName("connectionBadge")
+        self.connection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.connection_label.setStyleSheet("padding: 2px 10px; font-weight: bold;")
+        self.model_status_label.setObjectName("modelStatusBadge")
+        status.addPermanentWidget(self.connection_label)
+        status.addPermanentWidget(self.model_status_label)
         self.setStatusBar(status)
 
     def ai_model_config(self) -> AIModelConfig:
-        backend = AIBackend(self.backend_combo.currentData())
-        return AIModelConfig(
-            backend=backend,
-            local_model_path=self.model_path_input.text().strip(),
-            api_endpoint=self.api_endpoint_input.text().strip(),
-            api_model=self.api_model_input.text().strip(),
-            context_size=self._context_size,
-            max_tokens=self._max_tokens,
-            threads=self._threads,
-            gpu_layers=self._gpu_layers,
-            cpu_thread_limit=self._cpu_thread_limit,
-            self_correction_retries=self._self_correction_retries,
-        )
+        return self._ai_config
 
     def set_ai_model_config(self, config: AIModelConfig) -> None:
-        backend_index = self.backend_combo.findData(config.backend.value)
-        if backend_index >= 0:
-            self.backend_combo.setCurrentIndex(backend_index)
-        self.model_path_input.setText(config.local_model_path)
-        self.api_endpoint_input.setText(config.api_endpoint)
-        self.api_model_input.setText(config.api_model)
-        self._context_size = config.context_size or 2048
-        self._max_tokens = config.max_tokens or 512
-        self._threads = config.threads or 2
-        self._gpu_layers = getattr(config, "gpu_layers", 0)
-        self._cpu_thread_limit = getattr(config, "cpu_thread_limit", 4)
-        self._self_correction_retries = getattr(config, "self_correction_retries", 3)
-        self._sync_ai_controls()
+        self._ai_config = config
 
     def set_model_status(self, message: str, loaded: bool = False) -> None:
         self.model_status_label.setText(message)
@@ -478,10 +442,14 @@ class MainWindow(QMainWindow):
     def set_generated_queries(self, queries: list[str]) -> None:
         if queries:
             self.sql_editor.setPlainText(queries[0])
+            self.visual_builder.sql_editor.setPlainText(queries[0])
         else:
             self.sql_editor.clear()
+            self.visual_builder.sql_editor.clear()
 
     def selected_query(self) -> str:
+        if self.workspace_stack.currentIndex() == 1:
+            return self.visual_builder.sql_editor.toPlainText().strip()
         return self.sql_editor.toPlainText().strip()
 
     def set_question(self, question: str) -> None:
@@ -492,6 +460,7 @@ class MainWindow(QMainWindow):
         self.set_question(question)
         if sql:
             self.sql_editor.setPlainText(sql)
+            self.visual_builder.sql_editor.setPlainText(sql)
 
     def set_query_results(self, columns: list[str], rows: list[list[object]]) -> None:
         self.results_dialog.set_results(columns, rows)
@@ -569,11 +538,7 @@ class MainWindow(QMainWindow):
             self.browse_model_requested.emit()
 
     def _sync_ai_controls(self) -> None:
-        is_local = self.backend_combo.currentData() == AIBackend.LOCAL.value
-        self.model_path_input.setVisible(is_local)
-        self.browse_model_button.setVisible(is_local)
-        self.api_endpoint_input.setVisible(not is_local)
-        self.api_model_input.setVisible(not is_local)
+        pass
 
     def closeEvent(self, event: QCloseEvent) -> None:
         from PySide6.QtWidgets import QMessageBox
@@ -591,3 +556,12 @@ class MainWindow(QMainWindow):
 
     def _load_placeholder_content(self) -> None:
         pass
+
+    def _toggle_workspace_mode(self) -> None:
+        current_idx = self.workspace_stack.currentIndex()
+        if current_idx == 0:
+            self.workspace_stack.setCurrentIndex(1)
+            self.mode_switch_btn.setText("Trò chuyện AI 💬")
+        else:
+            self.workspace_stack.setCurrentIndex(0)
+            self.mode_switch_btn.setText("Tự Build Query 🛠️")
