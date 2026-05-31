@@ -1,4 +1,4 @@
-"""AI backend orchestration for text-to-SQL using in-process llama-cpp-python."""
+"""AI backend orchestration for text-to-SQL using local GGUF or API backends."""
 
 from __future__ import annotations
 
@@ -6,24 +6,24 @@ from collections.abc import Callable
 import json
 import os
 from pathlib import Path
+import threading
 import urllib.error
 import urllib.request
-
-import threading
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, GenerationResult
 from sqlbot_desktop.services.prompt_builder import PromptBuilder
 from sqlbot_desktop.services.query_validator import QueryValidator
+from sqlbot_desktop.services.sql_extractor import SQLExtractor
 
 
 class AIEngine:
-    """Load/unload local models and generate SQL via local or API backends."""
+    """Load/unload AI backends and generate SQL."""
 
     API_KEY_ENV = "SQLBOT_AI_API_KEY"
 
     def __init__(self) -> None:
         self.config: AIModelConfig | None = None
-        self.model = None  # Holds the llama_cpp.Llama object when loaded
+        self.model = None
         self._lock = threading.Lock()
 
     @property
@@ -44,6 +44,7 @@ class AIEngine:
 
     def unload(self) -> None:
         import gc
+
         self.model = None
         self.config = None
         gc.collect()
@@ -55,12 +56,19 @@ class AIEngine:
         dialect: str = "",
         check_cancelled: Callable[[], bool] | None = None,
     ) -> GenerationResult:
-        if not self.is_loaded or self.config is None:
-            return GenerationResult(False, message="Chưa load AI backend.")
         if len(question.strip()) < 3:
             return GenerationResult(False, message="Câu hỏi quá ngắn.")
-
         prompt = PromptBuilder.build(question.strip(), schema_context, dialect)
+        return self.generate_prompt(prompt, check_cancelled=check_cancelled)
+
+    def generate_prompt(
+        self,
+        prompt: str,
+        check_cancelled: Callable[[], bool] | None = None,
+    ) -> GenerationResult:
+        if not self.is_loaded or self.config is None:
+            return GenerationResult(False, message="Chưa load AI backend.")
+
         try:
             if self.config.backend == AIBackend.LOCAL:
                 raw_text = self._generate_local(prompt, check_cancelled)
@@ -71,11 +79,10 @@ class AIEngine:
                 return GenerationResult(False, message="Thao tác bị hủy")
             return GenerationResult(False, message=str(exc))
 
-        queries = self._extract_queries(raw_text)
-        safe_queries = QueryValidator.filter_readonly(queries)
+        safe_queries = QueryValidator.filter_readonly(SQLExtractor.extract_select_queries(raw_text))
         if not safe_queries:
-            return GenerationResult(False, message="AI không trả về câu SELECT hợp lệ.")
-        return GenerationResult(True, queries=safe_queries[:3], message="Đã sinh SQL.")
+            return GenerationResult(False, message=raw_text or "AI không trả về câu SELECT hợp lệ.")
+        return GenerationResult(True, queries=safe_queries[:3], message=raw_text)
 
     def generate_chat_response(
         self,
@@ -90,12 +97,11 @@ class AIEngine:
             if self.config.backend == AIBackend.LOCAL:
                 if self.model is None:
                     raise RuntimeError("Model chưa được load.")
-                # Local GGUF uses messages format directly with create_chat_completion
                 with self._lock:
                     response = self.model.create_chat_completion(
                         messages=messages,
                         max_tokens=self.config.max_tokens or 512,
-                        temperature=0.7,  # slightly higher temperature for assistant conversation
+                        temperature=0.7,
                         stream=True,
                     )
                     collected_text = ""
@@ -108,36 +114,19 @@ class AIEngine:
                             if "content" in delta:
                                 collected_text += delta["content"]
                     return collected_text
-            else:
-                # API AI backend
-                payload = {
-                    "model": self.config.api_model,
-                    "messages": messages,
-                    "temperature": 0.7,
-                    "max_tokens": self.config.max_tokens or 512,
-                }
-                request = urllib.request.Request(
-                    self.config.api_endpoint,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={
-                        "Authorization": f"Bearer {os.environ[self.API_KEY_ENV]}",
-                        "Content-Type": "application/json",
-                    },
-                    method="POST",
-                )
-                try:
-                    with urllib.request.urlopen(request, timeout=180) as response:
-                        if check_cancelled and check_cancelled():
-                            raise RuntimeError("Cancelled")
-                        payload = json.loads(response.read().decode("utf-8"))
-                except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-                    raise RuntimeError(f"Gọi API thất bại: {exc}") from exc
 
-                choices = payload.get("choices", [])
-                if not choices:
-                    return ""
-                message = choices[0].get("message", {})
-                return str(message.get("content", ""))
+            payload = {
+                "model": self.config.api_model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": self.config.max_tokens or 512,
+            }
+            response_payload = self._post_chat_payload(payload, check_cancelled)
+            choices = response_payload.get("choices", [])
+            if not choices:
+                return ""
+            message = choices[0].get("message", {})
+            return str(message.get("content", ""))
         except Exception as exc:
             if str(exc) in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError"):
                 raise RuntimeError("Cancelled") from exc
@@ -156,20 +145,17 @@ class AIEngine:
         try:
             from llama_cpp import Llama
 
-            # Auto-detect optimal threads count (Physical cores - 1, min 1)
             optimal_threads = config.threads
             if not optimal_threads:
-                import os
                 cpu_cores = os.cpu_count()
                 optimal_threads = max(1, (cpu_cores or 4) - 1)
 
-            # Initialize llama model directly in the Python process
             self.model = Llama(
                 model_path=str(model_path),
                 n_ctx=config.context_size or 4096,
                 n_threads=optimal_threads,
                 n_gpu_layers=getattr(config, "gpu_layers", 0),
-                n_batch=512,  # Optimized batch size to prevent high DRAM consumption
+                n_batch=512,
                 verbose=False,
             )
             self.config = config
@@ -192,7 +178,6 @@ class AIEngine:
         if self.model is None:
             raise RuntimeError("Model chưa được load.")
 
-        # Run token streaming using chat completion to apply the model's native chat template
         with self._lock:
             response = self.model.create_chat_completion(
                 messages=[
@@ -231,6 +216,19 @@ class AIEngine:
             "temperature": 0.1,
             "max_tokens": self.config.max_tokens or 512,
         }
+        response_payload = self._post_chat_payload(payload, check_cancelled)
+        choices = response_payload.get("choices", [])
+        if not choices:
+            return ""
+        message = choices[0].get("message", {})
+        return str(message.get("content", ""))
+
+    def _post_chat_payload(
+        self,
+        payload: dict,
+        check_cancelled: Callable[[], bool] | None = None,
+    ) -> dict:
+        assert self.config is not None
         request = urllib.request.Request(
             self.config.api_endpoint,
             data=json.dumps(payload).encode("utf-8"),
@@ -244,17 +242,9 @@ class AIEngine:
             with urllib.request.urlopen(request, timeout=180) as response:
                 if check_cancelled and check_cancelled():
                     raise RuntimeError("Cancelled")
-                payload = json.loads(response.read().decode("utf-8"))
+                return json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
             raise RuntimeError(f"Gọi API thất bại: {exc}") from exc
 
-        choices = payload.get("choices", [])
-        if not choices:
-            return ""
-        message = choices[0].get("message", {})
-        return str(message.get("content", ""))
-
     def _extract_queries(self, raw_text: str) -> list[str]:
-        cleaned = raw_text.replace("```sql", "```").replace("```", "").strip()
-        statements = [part.strip() for part in cleaned.split(";") if part.strip()]
-        return [f"{statement};" for statement in statements]
+        return SQLExtractor.extract_select_queries(raw_text)

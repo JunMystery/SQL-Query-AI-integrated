@@ -1,0 +1,18 @@
+{
+  "cases": [
+    {
+      "id": "users_001",
+      "question": "Liệt kê tên người dùng",
+      "expected_sql": "SELECT full_name FROM users;",
+      "dialect": "MYSQL",
+      "notes": "Ví dụ dry-run không chứa secret hoặc password."
+    },
+    {
+      "id": "orders_001",
+      "question": "Tính tổng doanh thu",
+      "expected_sql": "SELECT SUM(total_amount) FROM orders;",
+      "dialect": "MYSQL",
+      "notes": "Dùng để kiểm tra exact match/valid SELECT."
+    }
+  ]
+}

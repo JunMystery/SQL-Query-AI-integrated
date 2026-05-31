@@ -2,25 +2,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 from sqlbot_desktop.models.entities import TableInfo
 
 
-SYSTEM_PROMPT = """Bạn là chuyên gia SQL chuyển đổi câu hỏi tiếng Việt thành câu lệnh SQL.
+SYSTEM_PROMPT = """You are an expert Text-to-SQL assistant.
 
-QUY TẮC BẮT BUỘC:
-1. Chỉ tạo câu lệnh SELECT. KHÔNG tạo INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE.
-2. SỬ DỤNG ĐÚNG TÊN BẢNG VÀ CỘT THẬT TỪ SCHEMA ĐƯỢC CUNG CẤP. KHÔNG ĐƯỢC TỰ BỊA RA TÊN BẢNG HOẶC TÊN CỘT.
-3. Các ví dụ (nếu có) chỉ mang tính chất tham khảo cú pháp. Tuyệt đối không lấy tên bảng hoặc tên cột từ ví dụ (như 'nhan_vien', 'don_hang', 'phong_ban') trừ khi chúng thực sự xuất hiện trong phần SCHEMA được cung cấp.
-4. Với tiếng Việt có dấu, giữ nguyên giá trị như trong database.
-5. Ưu tiên JOIN thay vì subquery khi có thể.
-6. Nếu query phức tạp, có thể thêm comment SQL ngắn bằng cú pháp --.
-
-ĐẦU RA:
-Chỉ trả về duy nhất câu lệnh SQL hợp lệ, không giải thích bên ngoài SQL.
+Mandatory rules:
+1. Generate SELECT statements only. Never generate INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, MERGE, EXEC, GRANT, or REVOKE.
+2. Use only table names and column names that appear in the provided SCHEMA.
+3. Do not invent tables, columns, joins, filters, or business meanings.
+4. Do not copy table or column names from examples unless those names also appear in the provided SCHEMA.
+5. Preserve literal values exactly as they appear in the user's question or in database samples, including Vietnamese diacritics.
+6. Prefer joins only when a foreign key or explicit relationship is provided.
+7. Return valid SQL only. Do not include prose outside SQL.
+8. Reply in Vietnamese.
 """
 
 
-FEW_SHOT_EXAMPLES = [
+DEFAULT_FEW_SHOT_EXAMPLES = [
     {
         "question": "Liệt kê tên và lương của nhân viên phòng Kế toán",
         "sql": """SELECT nv.ho_ten, nv.luong
@@ -42,23 +43,41 @@ ORDER BY thang;""",
 
 
 class PromptBuilder:
-    """Build prompts for local or API AI backends."""
+    """Build compact prompts for local or API AI backends."""
 
     @staticmethod
     def system_prompt() -> str:
         return SYSTEM_PROMPT
 
     @staticmethod
-    def build(question: str, schema_context: str = "", dialect: str = "") -> str:
-        schema_block = schema_context or "Schema chưa được tải. Chỉ tạo SQL khi có đủ ngữ cảnh."
+    def build(
+        question: str,
+        schema_context: str = "",
+        dialect: str = "",
+        *,
+        error_message: str = "",
+        few_shot_examples: Sequence[Mapping[str, object]] | None = None,
+    ) -> str:
+        schema_block = schema_context or "Schema is not available. Generate SQL only when enough context is available."
         dialect_block = PromptBuilder._dialect_label(dialect)
-        examples = PromptBuilder._few_shot_block()
+        examples = PromptBuilder._few_shot_block(
+            few_shot_examples if few_shot_examples is not None else DEFAULT_FEW_SHOT_EXAMPLES
+        )
+        error_block = PromptBuilder._error_block(error_message)
+        example_block = (
+            "SYNTAX EXAMPLES:\n"
+            f"{examples}\n\n"
+            if examples
+            else ""
+        )
         return (
+            f"{SYSTEM_PROMPT}\n"
             f"DIALECT: {dialect_block}\n\n"
             f"SCHEMA:\n{schema_block}\n\n"
-            f"LƯU Ý QUAN TRỌNG: Các ví dụ bên dưới chỉ để tham khảo cú pháp SQL, không phản ánh cấu trúc database hiện tại. Chỉ sử dụng cấu trúc bảng và cột được định nghĩa trong SCHEMA ở trên.\n\n"
-            f"VÍ DỤ:\n{examples}\n\n"
-            f"CÂU HỎI:\n{question.strip()}\n\n"
+            "NOTE: Examples are syntax references only. Use only tables and columns that appear in SCHEMA.\n\n"
+            f"{example_block}"
+            f"{error_block}"
+            f"USER QUESTION:\n{question.strip()}\n\n"
             "SQL:"
         )
 
@@ -66,14 +85,14 @@ class PromptBuilder:
     def build_schema_context(tables: list[TableInfo], annotations: dict[str, object] | None = None) -> str:
         table_payloads = PromptBuilder._annotation_tables(annotations)
         lines: list[str] = []
-        for table in tables:
-            table_payload = table_payloads.get(table.name, {})
+        for table_info in tables:
+            table_payload = table_payloads.get(table_info.name, {})
             table_description = PromptBuilder._text(table_payload.get("description")) if table_payload else ""
-            table_label = f"{table_description} [{table.name}]" if table_description else table.name
+            table_label = f"{table_description} [{table_info.name}]" if table_description else table_info.name
             lines.append(f"- TABLE {table_label}")
 
             column_payloads = table_payload.get("columns", {}) if isinstance(table_payload, dict) else {}
-            for column in table.columns:
+            for column in table_info.columns:
                 column_payload = column_payloads.get(column.name, {}) if isinstance(column_payloads, dict) else {}
                 description = PromptBuilder._text(column_payload.get("description")) if isinstance(column_payload, dict) else ""
                 unit = PromptBuilder._text(column_payload.get("unit")) if isinstance(column_payload, dict) else ""
@@ -95,11 +114,25 @@ class PromptBuilder:
         return "\n".join(lines)
 
     @staticmethod
-    def _few_shot_block() -> str:
+    def _few_shot_block(examples: Sequence[Mapping[str, object]]) -> str:
         blocks = []
-        for example in FEW_SHOT_EXAMPLES:
-            blocks.append(f"Q: {example['question']}\nSQL:\n{example['sql']}")
+        for example in examples:
+            question = PromptBuilder._text(example.get("question"))
+            sql = PromptBuilder._text(example.get("sql"))
+            if question and sql:
+                blocks.append(f"Q: {question}\nSQL:\n{sql}")
         return "\n\n".join(blocks)
+
+    @staticmethod
+    def _error_block(error_message: str) -> str:
+        cleaned = error_message.strip()
+        if not cleaned:
+            return ""
+        return (
+            "PREVIOUS SQL ERROR:\n"
+            f"{cleaned}\n"
+            "Fix the SQL. The next answer must still be one valid SELECT statement only.\n\n"
+        )
 
     @staticmethod
     def _dialect_label(dialect: str) -> str:

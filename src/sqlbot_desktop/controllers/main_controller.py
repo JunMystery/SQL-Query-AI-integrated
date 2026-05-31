@@ -1,4 +1,4 @@
-"""Controller for the main SQLBot workspace."""
+﻿"""Controller for the main SQLBot workspace."""
 
 
 
@@ -52,6 +52,8 @@ from sqlbot_desktop.services.prompt_builder import PromptBuilder
 
 
 from sqlbot_desktop.services.query_validator import QueryValidator
+from sqlbot_desktop.services.sql_extractor import SQLExtractor
+from sqlbot_desktop.services.text_to_sql_pipeline import TextToSqlPipeline, TextToSqlResult
 
 
 from sqlbot_desktop.views.dialogs.ai_settings_dialog import AISettingsDialog
@@ -253,6 +255,7 @@ class MainController:
 
 
         self.ai_engine = AIEngine()
+        self.text_to_sql_pipeline = TextToSqlPipeline(self.ai_engine)
 
 
         self.view = MainWindow()
@@ -335,7 +338,7 @@ class MainController:
         except Exception as exc:
 
 
-            self.view.statusBar().showMessage(f"Không thể tải schema: {exc}")
+            self.view.statusBar().showMessage(f"KhÃ´ng thá»ƒ táº£i schema: {exc}")
 
 
             return
@@ -379,70 +382,65 @@ class MainController:
         self.view.append_user_message(question)
         self.view.append_status("AI đang suy nghĩ...")
 
-        # Build concise schema context using local RAG selector to fit within context limits and prevent hallucination
-        annotations = self.annotation_repository.load(self.profile.name)
-        from sqlbot_desktop.services.schema_rag import SchemaRAG
-        concise_schema = SchemaRAG.get_rag_schema_context(question, self.tables, annotations, max_tables=5)
-        dialect = self.profile.driver.upper()
-
-        system_content = (
-            "Bạn là trợ lý phân tích cấu trúc CSDL và dịch câu hỏi tiếng Việt sang câu lệnh SQL SELECT chính xác.\n"
-            "QUY TẮC BẮT BUỘC:\n"
-            f"1. Chỉ trả lời câu lệnh SELECT. Cú pháp tương thích hoàn toàn với hệ CSDL (Dialect): **{dialect}**.\n"
-            "2. Chỉ sử dụng đúng các bảng và cột thực tế được cung cấp trong phần SCHEMA dưới đây. Tuyệt đối không tự bịa ra tên bảng hoặc tên cột không tồn tại.\n"
-            "3. Lọc họ tên chính xác (ví dụ: lọc người dùng tên 'Tú' -> full_name = 'Tú' hoặc username = 'Tú' trên đúng bảng và cột tương ứng).\n"
-            f"4. Khi lọc theo ngày tháng, bắt buộc phải sử dụng định dạng chuẩn ISO-8601 YYYY-MM-DD (ví dụ: '2026-05-01' và '2026-05-10') trên đúng cột thời gian của bảng đó.\n"
-            "5. TUYỆT ĐỐI không tự ý nối (JOIN) các bảng bừa bãi dựa trên suy đoán. Chỉ thực hiện JOIN giữa các bảng nếu có quan hệ khóa ngoại (Foreign Keys) được định nghĩa rõ ràng trong phần '-- CÁC LIÊN KẾT LIÊN BẢNG HỢP LỆ' của SCHEMA dưới đây.\n"
-            "6. Tuyệt đối không trả về bất kỳ mã nguồn lập trình nào khác (như Python, Java, v.v.).\n"
-            "7. Trả về câu lệnh SQL đặt trong cặp dấu nháy ```sql ... ```.\n"
-            "8. Giải thích cực kỳ ngắn gọn (dưới 3 câu) về hoạt động của câu lệnh SQL vừa tạo bằng tiếng Việt, không mô tả các bước suy luận trung gian."
-        )
-
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": f"SCHEMA:\n{concise_schema}\n\nCÂU HỎI:\n{question}"}
-        ]
-
         self._start_task(
             "AI đang suy nghĩ...",
             "Đang dịch câu hỏi sang truy vấn SQL.",
-            lambda: self.ai_engine.generate_chat_response(
-                messages,
-                check_cancelled=self._is_task_cancelled
+            lambda: self.text_to_sql_pipeline.generate(
+                question,
+                db_name=self.profile.name,
+                dialect=self.profile.driver.upper(),
+                fallback_schema_context=self.schema_context,
+                execute_sql=(
+                    (lambda sql: self.database_manager.execute_select(sql, self.connection_name))
+                    if self.database_manager is not None and self.connection_name
+                    else None
+                ),
+                max_retries=3,
+                check_cancelled=self._is_task_cancelled,
             ),
             lambda result: self._handle_generate_result(question, result),
             show_busy_panel=False,
-            on_failed=lambda err: self._handle_generate_failed(question, err)
+            on_failed=lambda err: self._handle_generate_failed(question, err),
         )
 
     def _handle_generate_result(self, question: str, result: object) -> None:
-        text = str(result)
         self.view.remove_status()
 
-        # Display the result directly in the chat log
-        self.view.append_assistant_message(text)
+        if isinstance(result, TextToSqlResult):
+            if result.raw_text:
+                self.view.append_assistant_message(result.raw_text)
+            elif result.queries:
+                self.view.append_assistant_message(f"```sql\n{result.queries[0]}\n```")
+            else:
+                self.view.append_assistant_message(result.message)
+            if result.diagnostics.attempts > 1:
+                self.view.append_status(f"AI đã tự sửa SQL sau {result.diagnostics.attempts} lần.")
 
-        # Extract SQL blocks from response text
-        import re
-        sql = ""
-        matches = re.findall(r"```sql\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
-        if matches:
-            sql = matches[0].strip()
+            queries = result.queries if result.ok else []
         else:
-            generic_matches = re.findall(r"```\s*(SELECT.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
-            if generic_matches:
-                sql = generic_matches[0].strip()
+            text = str(result)
+            self.view.append_assistant_message(text)
+            queries = SQLExtractor.extract_select_queries(text)
 
-        if sql:
+        if queries:
             from sqlbot_desktop.services.query_corrector import QueryCorrector
-            corrected_sql = QueryCorrector.correct_query(sql, self.tables)
-            self.view.set_generated_queries([corrected_sql])
+
+            corrected_queries = [QueryCorrector.correct_query(sql, self.tables) for sql in queries]
+            corrected_sql = corrected_queries[0]
+            self.view.set_generated_queries(corrected_queries)
             self.activity_repository.add_history(question, corrected_sql, True)
-            self.view.statusBar().showMessage("Đã trích xuất SQL từ phản hồi trợ lý.")
+            attempts = result.diagnostics.attempts if isinstance(result, TextToSqlResult) else 1
+            if attempts > 1:
+                self.view.statusBar().showMessage(f"Đã sinh SQL hợp lệ sau {attempts} lần thử.")
+            else:
+                self.view.statusBar().showMessage("Đã trích xuất SQL từ phản hồi trợ lý.")
         else:
             self.view.set_generated_queries([])
             self.activity_repository.add_history(question, "", False)
-            self.view.statusBar().showMessage("AI phản hồi nhưng không tìm thấy code block SQL.")
+            if isinstance(result, TextToSqlResult) and result.message:
+                self.view.statusBar().showMessage(result.message)
+            else:
+                self.view.statusBar().showMessage("AI phản hồi nhưng không tìm thấy câu SELECT hợp lệ.")
 
     def _handle_generate_failed(self, question: str, error_message: str) -> None:
         self.view.remove_status()
@@ -451,7 +449,6 @@ class MainController:
         else:
             self.view.append_assistant_message(f"Không thể hoàn thành yêu cầu: {error_message}")
         self.activity_repository.add_history(question, "", False)
-
     def handle_chat_link(self, url: QUrl) -> None:
         href = url.toString()
         if href.startswith("apply:"):
@@ -461,7 +458,7 @@ class MainController:
             from PySide6.QtWidgets import QApplication
             prompt = href.partition("copy:")[2]
             QApplication.clipboard().setText(prompt)
-            self.view.statusBar().showMessage("Đã copy gợi ý vào clipboard.")
+            self.view.statusBar().showMessage("ÄÃ£ copy gá»£i Ã½ vÃ o clipboard.")
 
 
     def add_bookmark(self) -> None:
@@ -476,7 +473,7 @@ class MainController:
         if not question or not sql:
 
 
-            QMessageBox.information(self.view, "Thiếu dữ liệu", "Vui lòng có câu hỏi và SQL trước khi bookmark.")
+            QMessageBox.information(self.view, "Thiáº¿u dá»¯ liá»‡u", "Vui lÃ²ng cÃ³ cÃ¢u há»i vÃ  SQL trÆ°á»›c khi bookmark.")
 
 
             return
@@ -500,7 +497,7 @@ class MainController:
         self.activity_repository.add_bookmark(question, sql, dialog.category, dialog.notes)
 
 
-        self.view.statusBar().showMessage("Đã lưu bookmark.")
+        self.view.statusBar().showMessage("ÄÃ£ lÆ°u bookmark.")
 
 
 
@@ -521,7 +518,7 @@ class MainController:
         if not sql:
 
 
-            QMessageBox.information(self.view, "Chưa có SQL", "Không có Suggested Query để copy.")
+            QMessageBox.information(self.view, "ChÆ°a cÃ³ SQL", "KhÃ´ng cÃ³ Suggested Query Ä‘á»ƒ copy.")
 
 
             return
@@ -530,7 +527,7 @@ class MainController:
         QApplication.clipboard().setText(sql)
 
 
-        self.view.statusBar().showMessage("Đã copy SQL.")
+        self.view.statusBar().showMessage("ÄÃ£ copy SQL.")
 
 
 
@@ -542,7 +539,7 @@ class MainController:
         if self.busy:
 
 
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
+            QMessageBox.information(self.view, "AI Ä‘ang báº­n", "Vui lÃ²ng Ä‘á»£i thao tÃ¡c hiá»‡n táº¡i hoÃ n táº¥t.")
 
 
             return
@@ -551,7 +548,7 @@ class MainController:
         if self.database_manager is None or not self.connection_name:
 
 
-            QMessageBox.warning(self.view, "Chưa có kết nối", "Không tìm thấy kết nối database đang hoạt động.")
+            QMessageBox.warning(self.view, "ChÆ°a cÃ³ káº¿t ná»‘i", "KhÃ´ng tÃ¬m tháº¥y káº¿t ná»‘i database Ä‘ang hoáº¡t Ä‘á»™ng.")
 
 
             return
@@ -566,7 +563,7 @@ class MainController:
         if not sql:
 
 
-            QMessageBox.information(self.view, "Chưa có SQL", "Không có Suggested Query để execute.")
+            QMessageBox.information(self.view, "ChÆ°a cÃ³ SQL", "KhÃ´ng cÃ³ Suggested Query Ä‘á»ƒ execute.")
 
 
             return
@@ -575,7 +572,7 @@ class MainController:
         if not QueryValidator.is_readonly_select(sql):
 
 
-            QMessageBox.warning(self.view, "SQL không an toàn", "Chỉ cho phép thực thi câu SELECT.")
+            QMessageBox.warning(self.view, "SQL khÃ´ng an toÃ n", "Chá»‰ cho phÃ©p thá»±c thi cÃ¢u SELECT.")
 
 
             return
@@ -587,10 +584,10 @@ class MainController:
         self._start_task(
 
 
-            "Đang xử lý dữ liệu...",
+            "Äang xá»­ lÃ½ dá»¯ liá»‡u...",
 
 
-            "Đang thực thi SELECT và tải Query Results.",
+            "Äang thá»±c thi SELECT vÃ  táº£i Query Results.",
 
 
             lambda: self.database_manager.execute_select(sql, self.connection_name),
@@ -611,7 +608,7 @@ class MainController:
         if not result.ok:
 
 
-            QMessageBox.warning(self.view, "Execute thất bại", result.message)
+            QMessageBox.warning(self.view, "Execute tháº¥t báº¡i", result.message)
 
 
             self.view.statusBar().showMessage(result.message)
@@ -628,7 +625,7 @@ class MainController:
     def clear_chat_history(self) -> None:
         self.assistant_history = []
         self.view.clear_chat()
-        self.view.statusBar().showMessage("Đã xóa lịch sử phiên chat để giải phóng ngữ cảnh.")
+        self.view.statusBar().showMessage("ÄÃ£ xÃ³a lá»‹ch sá»­ phiÃªn chat Ä‘á»ƒ giáº£i phÃ³ng ngá»¯ cáº£nh.")
 
     def open_history(self) -> None:
 
@@ -675,7 +672,7 @@ class MainController:
         self.view.set_ai_model_config(dialog.config())
 
 
-        self.view.statusBar().showMessage("Đã cập nhật AI settings. Bấm Load để áp dụng.")
+        self.view.statusBar().showMessage("ÄÃ£ cáº­p nháº­t AI settings. Báº¥m Load Ä‘á»ƒ Ã¡p dá»¥ng.")
 
 
 
@@ -687,7 +684,7 @@ class MainController:
         if self.busy:
 
 
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
+            QMessageBox.information(self.view, "AI Ä‘ang báº­n", "Vui lÃ²ng Ä‘á»£i thao tÃ¡c hiá»‡n táº¡i hoÃ n táº¥t.")
 
 
             return
@@ -705,7 +702,7 @@ class MainController:
             self.view.set_model_status(validation_error, False)
 
 
-            QMessageBox.warning(self.view, "Load AI thất bại", validation_error)
+            QMessageBox.warning(self.view, "Load AI tháº¥t báº¡i", validation_error)
 
 
             return
@@ -716,10 +713,10 @@ class MainController:
 
         self._start_task(
             "Loading AI...",
-            "Đang load model GGUF local." if config.backend.value == "local" else "Đang kiểm tra cấu hình API AI.",
+            "Äang load model GGUF local." if config.backend.value == "local" else "Äang kiá»ƒm tra cáº¥u hÃ¬nh API AI.",
             lambda: self.ai_engine.load(config, check_cancelled=self._is_task_cancelled),
             self._handle_load_result,
-            on_failed=lambda err: self.view.set_model_status(f"Load model thất bại: {err}", False)
+            on_failed=lambda err: self.view.set_model_status(f"Load model tháº¥t báº¡i: {err}", False)
         )
 
 
@@ -735,7 +732,7 @@ class MainController:
         if not result.ok:
 
 
-            QMessageBox.warning(self.view, "Load AI thất bại", result.message)
+            QMessageBox.warning(self.view, "Load AI tháº¥t báº¡i", result.message)
 
 
 
@@ -747,7 +744,7 @@ class MainController:
         if self.busy:
 
 
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
+            QMessageBox.information(self.view, "AI Ä‘ang báº­n", "Vui lÃ²ng Ä‘á»£i thao tÃ¡c hiá»‡n táº¡i hoÃ n táº¥t.")
 
 
             return
@@ -756,7 +753,7 @@ class MainController:
         self.ai_engine.unload()
 
 
-        self.view.set_model_status("AI đã unload", False)
+        self.view.set_model_status("AI Ä‘Ã£ unload", False)
 
 
 
@@ -774,7 +771,7 @@ class MainController:
             if not model_path_text:
 
 
-                return "Vui lòng chọn file model GGUF trước khi bấm Load."
+                return "Vui lÃ²ng chá»n file model GGUF trÆ°á»›c khi báº¥m Load."
 
 
             model_path = Path(model_path_text)
@@ -783,13 +780,13 @@ class MainController:
             if model_path.suffix.lower() != ".gguf":
 
 
-                return "Vui lòng chọn file model định dạng .gguf."
+                return "Vui lÃ²ng chá»n file model Ä‘á»‹nh dáº¡ng .gguf."
 
 
             if not model_path.exists():
 
 
-                return "File model không tồn tại."
+                return "File model khÃ´ng tá»“n táº¡i."
 
 
             return ""
@@ -801,13 +798,13 @@ class MainController:
         if not config.api_endpoint.strip():
 
 
-            return "Vui lòng nhập API endpoint."
+            return "Vui lÃ²ng nháº­p API endpoint."
 
 
         if not config.api_model.strip():
 
 
-            return "Vui lòng nhập API model."
+            return "Vui lÃ²ng nháº­p API model."
 
 
         return ""
@@ -897,16 +894,16 @@ class MainController:
             else:
 
 
-                if message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError"):
+                if message in ("Cancelled", "Thao tÃ¡c bá»‹ há»§y", "cancelled", "CancelledError"):
 
 
-                    self.view.statusBar().showMessage("Đã hủy thao tác.")
+                    self.view.statusBar().showMessage("ÄÃ£ há»§y thao tÃ¡c.")
 
 
                     return
 
 
-                QMessageBox.warning(self.view, "Sinh SQL thất bại", message)
+                QMessageBox.warning(self.view, "Sinh SQL tháº¥t báº¡i", message)
 
 
                 self.view.statusBar().showMessage(message)
@@ -1023,7 +1020,7 @@ class MainController:
         self.task_cancelled = True
 
 
-        self.view.statusBar().showMessage("Đang hủy thao tác...")
+        self.view.statusBar().showMessage("Äang há»§y thao tÃ¡c...")
 
 
 
@@ -1056,9 +1053,5 @@ class MainController:
                 self._clear_worker()
 
 
-                self.view.statusBar().showMessage("Đã hủy thao tác.")
-
-
-
-
+                self.view.statusBar().showMessage("ÄÃ£ há»§y thao tÃ¡c.")
 

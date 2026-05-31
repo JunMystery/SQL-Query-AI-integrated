@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 from urllib.parse import quote_plus
 from uuid import uuid4
 
@@ -11,6 +12,7 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from sqlbot_desktop.models.entities import ConnectionProfile
+from sqlbot_desktop.services.query_validator import QueryValidator
 
 
 SUPPORTED_DRIVERS = {"MYSQL", "POSTGRESQL"}
@@ -29,6 +31,10 @@ class QueryExecutionResult:
     message: str = ""
     columns: list[str] | None = None
     rows: list[list[object]] | None = None
+    row_count: int = 0
+    elapsed_ms: float = 0.0
+    error_type: str = ""
+    sql: str = ""
 
 
 class DatabaseManager:
@@ -94,18 +100,53 @@ class DatabaseManager:
         connection_name: str | None = None,
         max_rows: int = 500,
     ) -> QueryExecutionResult:
+        started = perf_counter()
+        if not QueryValidator.is_readonly_select(sql):
+            return QueryExecutionResult(
+                False,
+                "Chỉ cho phép thực thi câu SELECT an toàn.",
+                error_type="validation",
+                sql=sql,
+            )
+
         try:
             result = self.database(connection_name).execute(text(sql))
             columns = [str(column) for column in result.keys()]
             rows = [list(row) for row in result.fetchmany(max_rows)]
-        except (KeyError, SQLAlchemyError, OSError) as exc:
-            return QueryExecutionResult(False, f"Không thể thực thi SQL: {exc}")
+        except KeyError as exc:
+            return QueryExecutionResult(
+                False,
+                f"Không tìm thấy kết nối database: {exc}",
+                error_type="connection",
+                sql=sql,
+                elapsed_ms=(perf_counter() - started) * 1000,
+            )
+        except SQLAlchemyError as exc:
+            return QueryExecutionResult(
+                False,
+                f"Không thể thực thi SQL: {exc}",
+                error_type="sql",
+                sql=sql,
+                elapsed_ms=(perf_counter() - started) * 1000,
+            )
+        except OSError as exc:
+            return QueryExecutionResult(
+                False,
+                f"Không thể thực thi SQL: {exc}",
+                error_type="io",
+                sql=sql,
+                elapsed_ms=(perf_counter() - started) * 1000,
+            )
 
+        elapsed_ms = (perf_counter() - started) * 1000
         return QueryExecutionResult(
             True,
             f"Đã tải {len(rows)} dòng.",
             columns,
             rows,
+            row_count=len(rows),
+            elapsed_ms=elapsed_ms,
+            sql=sql,
         )
 
     def close_connection(self, connection_name: str) -> None:

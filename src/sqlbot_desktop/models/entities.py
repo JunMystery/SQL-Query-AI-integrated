@@ -64,6 +64,23 @@ class TableInfo:
     foreign_keys: list[dict[str, str]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ColumnMetadata:
+    """Enriched column metadata stored outside the source database."""
+
+    db_name: str
+    table_name: str
+    column_name: str
+    data_type: str = ""
+    is_primary_key: bool = False
+    is_foreign_key: bool = False
+    referenced_table: str = ""
+    referenced_column: str = ""
+    business_description: str = ""
+    sample_values: list[str] = field(default_factory=list)
+    embedding: bytes | None = None
+
+
 class AIBackend(str, Enum):
     """Supported AI generation backends."""
 

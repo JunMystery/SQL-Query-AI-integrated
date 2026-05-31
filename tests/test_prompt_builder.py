@@ -23,6 +23,47 @@ class PromptBuilderTests(unittest.TestCase):
         self.assertIn("Liệt kê tên và lương", prompt)
         self.assertIn("TABLE employees", prompt)
         self.assertIn("Liệt kê nhân viên", prompt)
+        self.assertIn("Generate SELECT statements only", prompt)
+        self.assertIn("Reply in Vietnamese", prompt)
+        self.assertIn("USER QUESTION", prompt)
+
+    def test_system_prompt_is_english_with_vietnamese_reply_instruction(self) -> None:
+        system_prompt = PromptBuilder.system_prompt()
+
+        self.assertIn("You are an expert Text-to-SQL assistant.", system_prompt)
+        self.assertIn("Reply in Vietnamese.", system_prompt)
+        self.assertNotIn("Bạn là", system_prompt)
+        self.assertNotIn("Chỉ tạo", system_prompt)
+
+    def test_prompt_accepts_error_message_for_self_correction(self) -> None:
+        prompt = PromptBuilder.build(
+            "Lấy đơn hàng",
+            "## Table: orders\n- id (INTEGER, PK)",
+            "POSTGRESQL",
+            error_message='column "orderid" does not exist',
+            few_shot_examples=[],
+        )
+
+        self.assertIn("PostgreSQL", prompt)
+        self.assertIn("PREVIOUS SQL ERROR", prompt)
+        self.assertIn('column "orderid" does not exist', prompt)
+        self.assertNotIn("SYNTAX EXAMPLES", prompt)
+
+    def test_prompt_accepts_selected_few_shot_examples(self) -> None:
+        prompt = PromptBuilder.build(
+            "Tổng doanh thu",
+            "## Table: orders",
+            "MYSQL",
+            few_shot_examples=[
+                {
+                    "question": "Tổng tiền theo tháng",
+                    "sql": "SELECT month, SUM(total) FROM orders GROUP BY month;",
+                }
+            ],
+        )
+
+        self.assertIn("Tổng tiền theo tháng", prompt)
+        self.assertIn("SELECT month, SUM(total)", prompt)
 
     def test_schema_context_includes_real_names_and_annotations(self) -> None:
         tables = [TableInfo("employees", [ColumnInfo("employee_id", "int", False)])]

@@ -63,12 +63,6 @@ python scripts\build_app.py
 
 The legacy batch wrapper `.\scripts\build_exe.bat` calls the same Python build script.
 
-Local GGUF support is handled by a bundled C# sidecar built with LLamaSharp. The build machine needs the .NET 8 SDK to publish `SQLBot.LlmHost.exe`; end users do not need .NET installed because the sidecar is published self-contained.
-
-```powershell
-python scripts\build_app.py
-```
-
 The PyInstaller spec bundles direct Python DB packages for MySQL and PostgreSQL: `sqlalchemy`, `pymysql`, `psycopg`, and the PostgreSQL `libpq` runtime from `psycopg-binary`.
 
 After PyInstaller finishes, `scripts\post_build_sql_drivers.py` copies the `LIBPQ.dll` alias needed by PostgreSQL, and `scripts\verify_packaged_drivers.py` verifies that the EXE folder contains the expected portable MySQL/PostgreSQL drivers.

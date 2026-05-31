@@ -1,4 +1,4 @@
-"""Service tests for the local GGUF direct in-process integration and cancellation."""
+"""Service tests for AIEngine local/API loading and cancellation behavior."""
 
 from __future__ import annotations
 
@@ -36,12 +36,10 @@ class AIEngineTests(unittest.TestCase):
 
     def test_cancellation_during_generation(self) -> None:
         engine = AIEngine()
-        # Mock being loaded for testing cancellation logic
         engine.config = AIModelConfig(backend=AIBackend.API, api_endpoint="http://dummy", api_model="dummy")
-        
-        # Test generation with an immediate cancel callback
+
         result = engine.generate("Lấy danh sách tất cả nhân viên", check_cancelled=lambda: True)
-        
+
         self.assertFalse(result.ok)
         self.assertIn("hủy", result.message.lower())
 
