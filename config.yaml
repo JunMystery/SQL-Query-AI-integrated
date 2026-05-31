@@ -1,0 +1,7 @@
+self_correction:
+  enabled: true
+  max_retries: 3
+  log_errors: true
+  retry_delay_seconds: 0.0
+  include_error_in_prompt: true
+  stop_on_syntax_error: false

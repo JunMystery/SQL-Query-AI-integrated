@@ -30,7 +30,7 @@ class QueryValidator:
             return False
         if cls._has_multiple_statements(normalized):
             return False
-        tokens = set(re.findall(r"[a-z_]+", normalized))
+        tokens = set(re.findall(r"[a-z_]+", cls._without_string_literals(normalized)))
         return not bool(tokens & cls.DANGEROUS_KEYWORDS)
 
     @classmethod
@@ -92,3 +92,28 @@ class QueryValidator:
                 return True
             index += 1
         return False
+
+    @classmethod
+    def _without_string_literals(cls, sql: str) -> str:
+        cleaned: list[str] = []
+        in_single_quote = False
+        in_double_quote = False
+        index = 0
+        while index < len(sql):
+            char = sql[index]
+            next_char = sql[index + 1] if index + 1 < len(sql) else ""
+            if char == "'" and not in_double_quote:
+                if in_single_quote and next_char == "'":
+                    index += 2
+                    continue
+                in_single_quote = not in_single_quote
+                index += 1
+                continue
+            if char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                index += 1
+                continue
+            if not in_single_quote and not in_double_quote:
+                cleaned.append(char)
+            index += 1
+        return "".join(cleaned)

@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QColor
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ColumnInfo, ConnectionProfile, TableInfo
+from sqlbot_desktop.services.app_config import AppConfig
 from sqlbot_desktop.views.assets import asset_path
 from sqlbot_desktop.views.components.schema_tree_widget import SchemaTreeWidget
 from sqlbot_desktop.views.dialogs.query_results_dialog import QueryResultsDialog
@@ -65,6 +66,7 @@ class MainWindow(QMainWindow):
     bookmarks_requested = Signal()
     schema_requested = Signal()
     settings_requested = Signal()
+    refresh_samples_requested = Signal()
     cancel_requested = Signal()
     schema_assistant_requested = Signal()
     show_results_requested = Signal()
@@ -88,6 +90,7 @@ class MainWindow(QMainWindow):
         self.busy_detail_label = QLabel("")
         self.busy_progress = QProgressBar()
         self.question_input = PromptEdit()
+        self.send_button = QPushButton("Gửi yêu cầu")
         self.stop_button = QPushButton("Dừng")
         self.chat_view = QTextBrowser()
         self.sql_editor = QTextEdit()
@@ -97,10 +100,13 @@ class MainWindow(QMainWindow):
         self.schema_dock: QDockWidget | None = None
         self.result_headers: list[str] = []
         self.result_rows: list[list[object]] = []
-        self._context_size = 4096
+        self._busy = False
+        self._context_size = 2048
         self._max_tokens = 512
-        self._threads = 4
+        self._threads = 2
         self._gpu_layers = 0
+        self._cpu_thread_limit = 4
+        self._self_correction_retries = AppConfig.load().self_correction.max_retries
 
         self._build_menu()
         self._build_ui()
@@ -131,7 +137,9 @@ class MainWindow(QMainWindow):
 
         self.tools_menu = self.menu_bar.addMenu("Tools")
         settings_action = self.tools_menu.addAction("Settings")
+        refresh_samples_action = self.tools_menu.addAction("Refresh Sample Values")
         settings_action.triggered.connect(lambda checked=False: self.settings_requested.emit())
+        refresh_samples_action.triggered.connect(lambda checked=False: self.refresh_samples_requested.emit())
         self.setMenuBar(self.menu_bar)
 
     def _build_ui(self) -> None:
@@ -302,18 +310,16 @@ class MainWindow(QMainWindow):
         self.question_input.returnPressed.connect(self._on_send_clicked)
 
         prompt_actions = QHBoxLayout()
-        send_button = QPushButton("Gửi yêu cầu")
-        send_button.setObjectName("primaryButton")
-        send_button.setMinimumHeight(38)
-        send_button.clicked.connect(self._on_send_clicked)
+        self.send_button.setObjectName("primaryButton")
+        self.send_button.setMinimumHeight(38)
+        self.send_button.clicked.connect(self._on_send_clicked)
         
         self.stop_button.setObjectName("dangerButton")
         self.stop_button.setMinimumHeight(38)
-        self.stop_button.setFixedWidth(80)
         self.stop_button.setVisible(False)
         self.stop_button.clicked.connect(self.cancel_requested.emit)
         
-        prompt_actions.addWidget(send_button)
+        prompt_actions.addWidget(self.send_button)
         prompt_actions.addWidget(self.stop_button)
         prompt_actions.addStretch()
 
@@ -398,6 +404,9 @@ class MainWindow(QMainWindow):
         return panel
 
     def _on_send_clicked(self) -> None:
+        if self._busy:
+            self.cancel_requested.emit()
+            return
         text = self.question_input.toPlainText().strip()
         if not text:
             return
@@ -431,6 +440,8 @@ class MainWindow(QMainWindow):
             max_tokens=self._max_tokens,
             threads=self._threads,
             gpu_layers=self._gpu_layers,
+            cpu_thread_limit=self._cpu_thread_limit,
+            self_correction_retries=self._self_correction_retries,
         )
 
     def set_ai_model_config(self, config: AIModelConfig) -> None:
@@ -440,10 +451,12 @@ class MainWindow(QMainWindow):
         self.model_path_input.setText(config.local_model_path)
         self.api_endpoint_input.setText(config.api_endpoint)
         self.api_model_input.setText(config.api_model)
-        self._context_size = config.context_size or 4096
+        self._context_size = config.context_size or 2048
         self._max_tokens = config.max_tokens or 512
-        self._threads = config.threads or 4
+        self._threads = config.threads or 2
         self._gpu_layers = getattr(config, "gpu_layers", 0)
+        self._cpu_thread_limit = getattr(config, "cpu_thread_limit", 4)
+        self._self_correction_retries = getattr(config, "self_correction_retries", 3)
         self._sync_ai_controls()
 
     def set_model_status(self, message: str, loaded: bool = False) -> None:
@@ -454,9 +467,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message)
 
     def set_busy(self, active: bool, title: str = "", detail: str = "") -> None:
+        self._busy = active
         self.busy_title_label.setText(title)
         self.busy_detail_label.setText(detail)
         self.busy_panel.setVisible(active)
+        self.send_button.setVisible(not active)
         self.stop_button.setVisible(active)
         self.statusBar().showMessage(title or "Ready")
 

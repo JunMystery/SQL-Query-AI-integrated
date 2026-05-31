@@ -28,7 +28,12 @@ class QueryValidatorTests(unittest.TestCase):
             "DELETE FROM users",
             "DROP TABLE users",
             "ALTER TABLE users ADD COLUMN age INT",
+            "CREATE TABLE users (id INT)",
             "TRUNCATE TABLE users",
+            "MERGE INTO users USING temp_users ON users.id = temp_users.id",
+            "EXEC refresh_users",
+            "GRANT SELECT ON users TO demo",
+            "REVOKE SELECT ON users FROM demo",
         ]
 
         for sql in unsafe_sql:
@@ -48,6 +53,7 @@ class QueryValidatorTests(unittest.TestCase):
 
     def test_allows_semicolon_inside_string_literal(self) -> None:
         self.assertTrue(QueryValidator.is_readonly_select("SELECT 'a;b' AS label;"))
+        self.assertTrue(QueryValidator.is_readonly_select("SELECT * FROM users WHERE status = 'deleted';"))
 
     def test_cte_is_not_supported_in_phase_zero(self) -> None:
         self.assertFalse(QueryValidator.is_readonly_select("WITH recent AS (SELECT 1) SELECT * FROM recent;"))
@@ -89,6 +95,15 @@ class DatabaseManagerSelectGuardTests(unittest.TestCase):
         self.assertGreaterEqual(result.elapsed_ms, 0)
         self.assertEqual(result.sql, "SELECT id, name FROM users;")
         self.assertEqual(result.error_type, "")
+
+    def test_execute_select_respects_max_rows(self) -> None:
+        self.connection.execute(text("INSERT INTO users (name) VALUES ('Minh')"))
+
+        result = self.manager.execute_select("SELECT id, name FROM users ORDER BY id;", max_rows=1)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.rows, [[1, "Lan"]])
+        self.assertEqual(result.row_count, 1)
 
     def test_execute_select_rejects_non_select(self) -> None:
         result = self.manager.execute_select("DELETE FROM users;")

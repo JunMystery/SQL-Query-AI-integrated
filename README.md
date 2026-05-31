@@ -67,6 +67,8 @@ The PyInstaller spec bundles direct Python DB packages for MySQL and PostgreSQL:
 
 After PyInstaller finishes, `scripts\post_build_sql_drivers.py` copies the `LIBPQ.dll` alias needed by PostgreSQL, and `scripts\verify_packaged_drivers.py` verifies that the EXE folder contains the expected portable MySQL/PostgreSQL drivers.
 
+The `sentence-transformers` Python package is installed from `requirements.txt`, but the `all-MiniLM-L6-v2` embedding model cache is not bundled into the EXE by default because it can make the build much heavier. On a machine without the cached model or internet access, SQLBot falls back to deterministic local embeddings and continues to build prompts.
+
 Connection profiles are loaded from `data/connections.json` when available. If the file does not exist, create a MySQL or PostgreSQL profile from Connection Management.
 
 ## Module 1
@@ -95,6 +97,7 @@ The main workspace layout includes:
 - Suggested SQL query list beside the question input.
 - Settings icon/menu for History, Bookmarks, Schema, and Settings.
 - Query Results renders executed SELECT data and can export CSV.
+- Self-correction can generate a SELECT, execute it safely, feed SQL errors back into the next prompt, and retry up to the configured limit. Defaults are in `config.yaml`, and the retry count can be adjusted in AI Settings via `Self-Correct`. See `docs/SELF_CORRECTION.md`.
 
 ## Module 2.2
 
@@ -106,6 +109,20 @@ Text-to-SQL generation now supports two AI backends:
 Use `Unload` to release the active AI backend. Closing the application asks for confirmation and unloads the model.
 
 Long-running AI load/generate operations run in a background worker and show an indeterminate progress view.
+
+## Module 2.3
+
+Schema linking prefers neural embeddings through `sentence-transformers` with the lightweight `all-MiniLM-L6-v2` model. The first run may need to download this embedding model. If `sentence-transformers` is unavailable or the model cannot be loaded, SQLBot falls back to the deterministic local embedding model so the app can still start and generate prompts offline.
+
+Sample values can be refreshed from the schema tools. SQLBot reads them with SELECT-only queries, stores only short local metadata in `data/schema_metadata.sqlite`, and skips or redacts sensitive columns such as passwords, tokens, keys, phone numbers, and email addresses. Refreshing sample values never writes to the source database.
+
+Prompt generation uses an internal SQL skeleton planning instruction to help smaller models choose the query shape before filling real table and column names. The skeleton is not shown to the user and the final response is still constrained to valid SELECT SQL only.
+
+Install or refresh AI dependencies with:
+
+```powershell
+pip install -r requirements.txt
+```
 
 ## Module 2.4
 

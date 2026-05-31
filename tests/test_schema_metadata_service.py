@@ -70,6 +70,31 @@ class SchemaMetadataServiceTests(unittest.TestCase):
         self.assertEqual(fk_column.referenced_table, "users")
         self.assertEqual(fk_column.referenced_column, "id")
 
+    def test_import_tables_preserves_raw_sample_values(self) -> None:
+        imported = self.service.import_tables(
+            "demo",
+            [
+                TableInfo(
+                    "users",
+                    [
+                        ColumnInfo(
+                            "status",
+                            "TEXT",
+                            sample_value="active",
+                            enum_values=["active", "locked", "pending", "archived"],
+                        )
+                    ],
+                )
+            ],
+        )
+
+        row = self.repository.get_column("demo", "users", "status")
+
+        self.assertEqual(imported, 1)
+        self.assertIsNotNone(row)
+        assert row is not None
+        self.assertEqual(row.sample_values, ["active", "locked", "pending"])
+
     def test_import_business_descriptions_updates_only_matching_columns(self) -> None:
         self.service.import_tables("demo", [TableInfo("users", [ColumnInfo("status", "TEXT")])])
         path = self.base_path / "descriptions.json"
@@ -121,6 +146,9 @@ class SchemaMetadataServiceTests(unittest.TestCase):
             connection.execute(text("CREATE TABLE users (id INTEGER, name TEXT, password_hash TEXT)"))
             connection.execute(text("INSERT INTO users VALUES (1, 'Lan', 'secret')"))
             connection.execute(text("INSERT INTO users VALUES (2, 'Minh', 'secret2')"))
+            connection.execute(text("INSERT INTO users VALUES (3, 'Lan', 'secret3')"))
+            connection.execute(text("INSERT INTO users VALUES (4, 'Tu', 'secret4')"))
+            connection.execute(text("INSERT INTO users VALUES (5, 'Hoa', 'secret5')"))
             connection.commit()
 
             self.service.import_tables(
@@ -146,7 +174,7 @@ class SchemaMetadataServiceTests(unittest.TestCase):
         self.assertIsNotNone(password)
         assert name is not None
         assert password is not None
-        self.assertEqual(name.sample_values, ["Lan", "Minh"])
+        self.assertEqual(name.sample_values, ["Lan", "Minh", "Tu"])
         self.assertEqual(password.sample_values, ["[REDACTED]"])
 
     def test_refresh_sample_values_collects_per_column_errors(self) -> None:

@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sqlbot_desktop.controllers.main_controller import MainController  # noqa: E402
-from sqlbot_desktop.models.entities import ConnectionProfile  # noqa: E402
+from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ConnectionProfile  # noqa: E402
 from sqlbot_desktop.services.text_to_sql_pipeline import TextToSqlDiagnostics, TextToSqlResult  # noqa: E402
 
 
@@ -47,6 +47,9 @@ class FakeView:
 
     def statusBar(self) -> FakeStatusBar:
         return self._status_bar
+
+    def ai_model_config(self) -> AIModelConfig:
+        return AIModelConfig(backend=AIBackend.API, self_correction_retries=4)
 
 
 class FakeActivityRepository:
@@ -129,7 +132,7 @@ class MainControllerPipelineTests(unittest.TestCase):
         self.assertEqual(controller.text_to_sql_pipeline.calls[0]["db_name"], "Demo")
         self.assertEqual(controller.text_to_sql_pipeline.calls[0]["dialect"], "MYSQL")
         self.assertIsNotNone(controller.text_to_sql_pipeline.calls[0]["execute_sql"])
-        self.assertEqual(controller.text_to_sql_pipeline.calls[0]["max_retries"], 3)
+        self.assertEqual(controller.text_to_sql_pipeline.calls[0]["max_retries"], 4)
         self.assertEqual(controller.view.generated_queries, ["SELECT id FROM users;"])
         self.assertEqual(controller.activity_repository.history, [("Lấy user", "SELECT id FROM users;", True)])
         self.assertIn("2 lần", controller.view.status_messages[-1])

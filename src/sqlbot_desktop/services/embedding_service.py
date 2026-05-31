@@ -6,6 +6,7 @@ from array import array
 import hashlib
 import math
 import re
+from collections.abc import Callable
 from typing import Protocol
 
 
@@ -38,17 +39,45 @@ class DeterministicEmbeddingModel:
 class SentenceTransformersEmbeddingModel:
     """Optional sentence-transformers adapter loaded lazily."""
 
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
+    DEFAULT_MODEL_NAME = "all-MiniLM-L6-v2"
+
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL_NAME,
+        *,
+        model_factory: Callable[[str], object] | None = None,
+        fallback_model: EmbeddingModel | None = None,
+    ) -> None:
         self.model_name = model_name
+        self.model_factory = model_factory
+        self.fallback_model = fallback_model
         self._model = None
 
     def embed_text(self, text: str) -> list[float]:
-        if self._model is None:
-            from sentence_transformers import SentenceTransformer
+        try:
+            if self._model is None:
+                self._model = self._load_model()
+            vector = self._model.encode(text)
+            return [float(value) for value in vector]
+        except Exception as exc:
+            if self.fallback_model is not None:
+                return self.fallback_model.embed_text(text)
+            raise RuntimeError(
+                "sentence-transformers is required for neural embeddings. "
+                "Install it with: pip install sentence-transformers"
+            ) from exc
 
-            self._model = SentenceTransformer(self.model_name)
-        vector = self._model.encode(text)
-        return [float(value) for value in vector]
+    def _load_model(self) -> object:
+        if self.model_factory is not None:
+            return self.model_factory(self.model_name)
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RuntimeError(
+                "sentence-transformers is not installed. "
+                "Install it with: pip install sentence-transformers"
+            ) from exc
+        return SentenceTransformer(self.model_name)
 
 
 def vector_to_blob(vector: list[float]) -> bytes:

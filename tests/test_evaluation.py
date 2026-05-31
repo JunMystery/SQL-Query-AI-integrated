@@ -104,8 +104,36 @@ class EvaluationDatasetLoaderTests(unittest.TestCase):
     def test_sample_dataset_loads(self) -> None:
         cases = EvaluationDatasetLoader().load(PROJECT_ROOT / "docs" / "evaluation_dataset_sample.json")
 
-        self.assertGreaterEqual(len(cases), 2)
+        self.assertGreaterEqual(len(cases), 5)
         self.assertTrue(all(case.id and case.question for case in cases))
+        ids = {case.id for case in cases}
+        self.assertTrue(
+            {
+                "simple_select_001",
+                "filter_status_001",
+                "join_001",
+                "aggregate_001",
+                "group_by_001",
+                "order_by_001",
+                "date_filter_001",
+            }.issubset(ids)
+        )
+        self.assertTrue(all(case.expected_sql.upper().startswith("SELECT") for case in cases))
+
+    def test_sample_dataset_dry_run_baseline_is_exact_match(self) -> None:
+        cases = EvaluationDatasetLoader().load(PROJECT_ROOT / "docs" / "evaluation_dataset_sample.json")
+
+        class ExpectedSqlPipeline:
+            def generate(self, question: str, db_name: str, dialect: str, fallback_schema_context: str = "", **kwargs):
+                for case in cases:
+                    if case.question == question:
+                        return TextToSqlResult(True, queries=[case.expected_sql], message="baseline", raw_text=case.expected_sql)
+                return TextToSqlResult(False, message="missing baseline")
+
+        report = TextToSqlEvaluator().evaluate(cases, ExpectedSqlPipeline(), db_name="demo")
+
+        self.assertEqual(report.metrics.exact_match_rate, 1.0)
+        self.assertEqual(report.metrics.valid_select_rate, 1.0)
 
 
 class TextToSqlEvaluatorTests(unittest.TestCase):

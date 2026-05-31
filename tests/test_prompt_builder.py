@@ -26,6 +26,7 @@ class PromptBuilderTests(unittest.TestCase):
         self.assertIn("Generate SELECT statements only", prompt)
         self.assertIn("Reply in Vietnamese", prompt)
         self.assertIn("USER QUESTION", prompt)
+        self.assertIn("SQL planning process", prompt)
 
     def test_system_prompt_is_english_with_vietnamese_reply_instruction(self) -> None:
         system_prompt = PromptBuilder.system_prompt()
@@ -47,7 +48,37 @@ class PromptBuilderTests(unittest.TestCase):
         self.assertIn("PostgreSQL", prompt)
         self.assertIn("PREVIOUS SQL ERROR", prompt)
         self.assertIn('column "orderid" does not exist', prompt)
+        self.assertIn("JOIN conditions", prompt)
+        self.assertIn("data types", prompt)
         self.assertNotIn("SYNTAX EXAMPLES", prompt)
+
+    def test_error_message_is_clipped_before_prompting(self) -> None:
+        long_error = "column missing_column does not exist\n" + ("traceback detail " * 100)
+
+        prompt = PromptBuilder.build(
+            "Lay user",
+            "TABLE users",
+            "MYSQL",
+            error_message=long_error,
+            few_shot_examples=[],
+        )
+
+        self.assertIn("column missing_column does not exist", prompt)
+        self.assertIn("...", prompt)
+        self.assertLess(len(prompt), 2000)
+
+    def test_skeleton_instruction_is_internal_only(self) -> None:
+        prompt = PromptBuilder.build("Liệt kê khách hàng", "TABLE customers", "MYSQL")
+
+        self.assertIn("Internally choose the SQL skeleton first", prompt)
+        self.assertIn("Do not output the skeleton", prompt)
+        self.assertNotIn("SELECT {columns}", prompt)
+        self.assertNotIn("{tables}", prompt)
+
+    def test_skeleton_instruction_can_be_disabled_for_direct_prompt(self) -> None:
+        prompt = PromptBuilder.build("Liệt kê khách hàng", "TABLE customers", "MYSQL", use_skeleton=False)
+
+        self.assertNotIn("SQL planning process", prompt)
 
     def test_prompt_accepts_selected_few_shot_examples(self) -> None:
         prompt = PromptBuilder.build(
@@ -89,6 +120,27 @@ class PromptBuilderTests(unittest.TestCase):
         self.assertIn("real_name=employee_id", context)
         self.assertIn("description=Mã nhân viên", context)
         self.assertIn("note=khóa chính", context)
+
+    def test_schema_context_includes_limited_samples(self) -> None:
+        tables = [
+            TableInfo(
+                "employees",
+                [
+                    ColumnInfo(
+                        "employee_id",
+                        "int",
+                        False,
+                        sample_value="1",
+                        enum_values=["1", "2", "3", "4"],
+                    )
+                ],
+            )
+        ]
+
+        context = PromptBuilder.build_schema_context(tables)
+
+        self.assertIn("samples='1', '2', '3'", context)
+        self.assertNotIn("'4'", context)
 
     def test_validator_allows_leading_sql_comments(self) -> None:
         self.assertTrue(QueryValidator.is_readonly_select("-- dùng JOIN\nSELECT * FROM employees;"))

@@ -152,7 +152,7 @@ class AIEngine:
 
             self.model = Llama(
                 model_path=str(model_path),
-                n_ctx=config.context_size or 4096,
+                n_ctx=config.context_size or 2048,
                 n_threads=optimal_threads,
                 n_gpu_layers=getattr(config, "gpu_layers", 0),
                 n_batch=512,

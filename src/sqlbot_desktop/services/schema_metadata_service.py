@@ -45,6 +45,7 @@ class SchemaMetadataService:
                         is_foreign_key=column_info.is_foreign or bool(referenced_table),
                         referenced_table=referenced_table,
                         referenced_column=referenced_column,
+                        sample_values=self._column_sample_values(column_info),
                     )
                 )
         self.repository.upsert_columns(rows)
@@ -152,6 +153,19 @@ class SchemaMetadataService:
             if constrained_column:
                 mapping[constrained_column] = (referred_table, referred_column)
         return mapping
+
+    def _column_sample_values(self, column_info: object) -> list[str]:
+        samples: list[str] = []
+        sample_value = str(getattr(column_info, "sample_value", "") or "").strip()
+        if sample_value:
+            samples.append(sample_value)
+        for value in getattr(column_info, "enum_values", []) or []:
+            sample = str(value).strip()
+            if sample and sample not in samples:
+                samples.append(sample)
+            if len(samples) >= 3:
+                break
+        return samples[:3]
 
     def _description_items(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
         if isinstance(payload.get("columns"), list):

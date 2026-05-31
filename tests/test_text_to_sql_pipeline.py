@@ -71,6 +71,13 @@ class TextToSqlPipelineTests(unittest.TestCase):
         self.assertIn("## Table: users", ai.prompts[0])
         self.assertNotIn("fallback schema", ai.prompts[0])
 
+    def test_pipeline_defaults_to_neural_embedding_with_deterministic_fallback(self) -> None:
+        ai = FakeAIEngine(GenerationResult(True, message="SELECT * FROM fallback_table;"))
+        pipeline = TextToSqlPipeline(ai, self.metadata, few_shot_repository=self.few_shots)
+
+        self.assertEqual(type(pipeline.embedding_model).__name__, "SentenceTransformersEmbeddingModel")
+        self.assertEqual(type(pipeline.embedding_model.fallback_model).__name__, "DeterministicEmbeddingModel")
+
     def test_pipeline_falls_back_when_metadata_is_empty(self) -> None:
         ai = FakeAIEngine(GenerationResult(True, message="SELECT * FROM fallback_table;"))
         pipeline = TextToSqlPipeline(ai, self.metadata, FixedEmbeddingModel({}), self.few_shots)
@@ -81,6 +88,8 @@ class TextToSqlPipelineTests(unittest.TestCase):
         self.assertFalse(result.diagnostics.used_metadata)
         self.assertIn("chưa có dữ liệu", result.diagnostics.message)
         self.assertIn("TABLE fallback_table", ai.prompts[0])
+        self.assertIn("SQL planning process", ai.prompts[0])
+        self.assertIn("Đếm số đơn hàng theo trạng thái", ai.prompts[0])
 
     def test_pipeline_returns_failure_when_ai_has_no_valid_select(self) -> None:
         ai = FakeAIEngine(GenerationResult(True, message="Tôi không biết."))
@@ -125,6 +134,7 @@ class TextToSqlPipelineTests(unittest.TestCase):
         self.assertEqual(executions, ["SELECT missing_column FROM users;", "SELECT full_name FROM users;"])
         self.assertIn("PREVIOUS SQL ERROR", ai.prompts[1])
         self.assertIn("missing_column", ai.prompts[1])
+        self.assertEqual(result.diagnostics.error_history, ["column missing_column does not exist"])
 
     def test_pipeline_retries_when_ai_returns_non_select(self) -> None:
         ai = FakeAIEngine(
@@ -145,7 +155,7 @@ class TextToSqlPipelineTests(unittest.TestCase):
 
         self.assertTrue(result.ok)
         self.assertEqual(result.diagnostics.attempts, 2)
-        self.assertIn("AI không trả về câu SELECT hợp lệ", ai.prompts[1])
+        self.assertIn("AI khong tra ve cau SELECT hop le", ai.prompts[1])
 
     def test_pipeline_returns_last_error_after_max_retries(self) -> None:
         ai = FakeAIEngine(GenerationResult(True, message="```sql\nSELECT missing_column FROM users;\n```"))
@@ -163,7 +173,35 @@ class TextToSqlPipelineTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.diagnostics.attempts, 2)
         self.assertIn("missing_column", result.message)
+        self.assertEqual(
+            result.diagnostics.error_history,
+            ["column missing_column does not exist", "column missing_column does not exist"],
+        )
         self.assertEqual(len(ai.prompts), 2)
+
+    def test_pipeline_stops_before_execution_when_cancelled_after_generation(self) -> None:
+        ai = FakeAIEngine(GenerationResult(True, message="```sql\nSELECT id FROM users;\n```"))
+        pipeline = TextToSqlPipeline(ai, self.metadata, FixedEmbeddingModel({}), self.few_shots)
+        calls = {"count": 0}
+        executed: list[str] = []
+
+        def check_cancelled() -> bool:
+            calls["count"] += 1
+            return calls["count"] >= 2
+
+        result = pipeline.generate(
+            "Lay user",
+            "demo",
+            "MYSQL",
+            "TABLE users",
+            execute_sql=lambda sql: executed.append(sql) or QueryExecutionResult(True),
+            check_cancelled=check_cancelled,
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(executed, [])
+        self.assertIn("huy", result.message)
+        self.assertEqual(result.diagnostics.error_history, ["Thao tac bi huy"])
 
 
 if __name__ == "__main__":

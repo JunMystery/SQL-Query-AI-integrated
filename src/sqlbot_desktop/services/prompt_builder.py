@@ -20,6 +20,13 @@ Mandatory rules:
 8. Reply in Vietnamese.
 """
 
+SKELETON_INSTRUCTION = """SQL planning process:
+1. Internally choose the SQL skeleton first: SELECT columns FROM tables WHERE filters GROUP BY fields ORDER BY fields.
+2. Fill the skeleton only with real table names, column names, joins, filters, and literal values from SCHEMA and USER QUESTION.
+3. Do not output the skeleton, placeholders, or planning notes.
+4. The final answer must be one valid SELECT statement only.
+"""
+
 
 DEFAULT_FEW_SHOT_EXAMPLES = [
     {
@@ -39,6 +46,13 @@ WHERE strftime('%Y', ngay_tao) = '2025'
 GROUP BY strftime('%m', ngay_tao)
 ORDER BY thang;""",
     },
+    {
+        "question": "Đếm số đơn hàng theo trạng thái",
+        "sql": """SELECT trang_thai, COUNT(*) AS so_don_hang
+FROM don_hang
+GROUP BY trang_thai
+ORDER BY so_don_hang DESC;""",
+    },
 ]
 
 
@@ -57,6 +71,7 @@ class PromptBuilder:
         *,
         error_message: str = "",
         few_shot_examples: Sequence[Mapping[str, object]] | None = None,
+        use_skeleton: bool = True,
     ) -> str:
         schema_block = schema_context or "Schema is not available. Generate SQL only when enough context is available."
         dialect_block = PromptBuilder._dialect_label(dialect)
@@ -72,6 +87,7 @@ class PromptBuilder:
         )
         return (
             f"{SYSTEM_PROMPT}\n"
+            f"{SKELETON_INSTRUCTION if use_skeleton else ''}\n"
             f"DIALECT: {dialect_block}\n\n"
             f"SCHEMA:\n{schema_block}\n\n"
             "NOTE: Examples are syntax references only. Use only tables and columns that appear in SCHEMA.\n\n"
@@ -109,6 +125,9 @@ class PromptBuilder:
                     details.append(f"unit={unit}")
                 if note:
                     details.append(f"note={note}")
+                samples = PromptBuilder._column_samples(column)
+                if samples:
+                    details.append(f"samples={', '.join(samples)}")
                 lines.append(f"  - COLUMN {'; '.join(details)}")
 
         return "\n".join(lines)
@@ -125,14 +144,23 @@ class PromptBuilder:
 
     @staticmethod
     def _error_block(error_message: str) -> str:
-        cleaned = error_message.strip()
+        cleaned = PromptBuilder._clip_error(error_message)
         if not cleaned:
             return ""
         return (
             "PREVIOUS SQL ERROR:\n"
             f"{cleaned}\n"
-            "Fix the SQL. The next answer must still be one valid SELECT statement only.\n\n"
+            "Fix the SQL by checking table names, column names, JOIN conditions, "
+            "data types in filters, and dialect-specific syntax. "
+            "The next answer must still be one valid SELECT statement only.\n\n"
         )
+
+    @staticmethod
+    def _clip_error(error_message: str, limit: int = 400) -> str:
+        cleaned = " ".join(str(error_message).strip().split())
+        if len(cleaned) <= limit:
+            return cleaned
+        return f"{cleaned[: limit - 3]}..."
 
     @staticmethod
     def _dialect_label(dialect: str) -> str:
@@ -155,3 +183,18 @@ class PromptBuilder:
     @staticmethod
     def _text(value: object) -> str:
         return str(value).strip() if value is not None else ""
+
+    @staticmethod
+    def _column_samples(column: object) -> list[str]:
+        samples: list[str] = []
+        sample_value = PromptBuilder._text(getattr(column, "sample_value", ""))
+        if sample_value:
+            samples.append(repr(sample_value))
+        for value in getattr(column, "enum_values", []) or []:
+            sample = PromptBuilder._text(value)
+            rendered = repr(sample)
+            if sample and rendered not in samples:
+                samples.append(rendered)
+            if len(samples) >= 3:
+                break
+        return samples[:3]

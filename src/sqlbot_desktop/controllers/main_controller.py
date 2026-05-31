@@ -1,4 +1,4 @@
-﻿"""Controller for the main SQLBot workspace."""
+"""Controller for the main SQLBot workspace."""
 
 
 
@@ -48,10 +48,13 @@ from sqlbot_desktop.services.ai_engine import AIEngine
 from PySide6.QtCore import QUrl
 
 
+from sqlbot_desktop.services.cpu_limiter import CpuLimiter
 from sqlbot_desktop.services.prompt_builder import PromptBuilder
 
 
 from sqlbot_desktop.services.query_validator import QueryValidator
+from sqlbot_desktop.services.query_logger import QueryLogger
+from sqlbot_desktop.services.schema_metadata_service import SchemaMetadataService
 from sqlbot_desktop.services.sql_extractor import SQLExtractor
 from sqlbot_desktop.services.text_to_sql_pipeline import TextToSqlPipeline, TextToSqlResult
 
@@ -255,7 +258,7 @@ class MainController:
 
 
         self.ai_engine = AIEngine()
-        self.text_to_sql_pipeline = TextToSqlPipeline(self.ai_engine)
+        self.text_to_sql_pipeline = TextToSqlPipeline(self.ai_engine, query_logger=QueryLogger())
 
 
         self.view = MainWindow()
@@ -295,6 +298,9 @@ class MainController:
 
 
         self.view.settings_requested.connect(self.open_settings)
+
+
+        self.view.refresh_samples_requested.connect(self.refresh_sample_values)
 
 
         self.view.cancel_requested.connect(self.cancel_task)
@@ -338,7 +344,7 @@ class MainController:
         except Exception as exc:
 
 
-            self.view.statusBar().showMessage(f"KhÃ´ng thá»ƒ táº£i schema: {exc}")
+            self.view.statusBar().showMessage(f"Không thể tải schema: {exc}")
 
 
             return
@@ -395,7 +401,7 @@ class MainController:
                     if self.database_manager is not None and self.connection_name
                     else None
                 ),
-                max_retries=3,
+                max_retries=self._self_correction_retries(),
                 check_cancelled=self._is_task_cancelled,
             ),
             lambda result: self._handle_generate_result(question, result),
@@ -458,7 +464,7 @@ class MainController:
             from PySide6.QtWidgets import QApplication
             prompt = href.partition("copy:")[2]
             QApplication.clipboard().setText(prompt)
-            self.view.statusBar().showMessage("ÄÃ£ copy gá»£i Ã½ vÃ o clipboard.")
+            self.view.statusBar().showMessage("Đã copy gợi ý vào clipboard.")
 
 
     def add_bookmark(self) -> None:
@@ -473,7 +479,7 @@ class MainController:
         if not question or not sql:
 
 
-            QMessageBox.information(self.view, "Thiáº¿u dá»¯ liá»‡u", "Vui lÃ²ng cÃ³ cÃ¢u há»i vÃ  SQL trÆ°á»›c khi bookmark.")
+            QMessageBox.information(self.view, "Thiếu dữ liệu", "Vui lòng có câu hỏi và SQL trước khi bookmark.")
 
 
             return
@@ -497,7 +503,7 @@ class MainController:
         self.activity_repository.add_bookmark(question, sql, dialog.category, dialog.notes)
 
 
-        self.view.statusBar().showMessage("ÄÃ£ lÆ°u bookmark.")
+        self.view.statusBar().showMessage("Đã lưu bookmark.")
 
 
 
@@ -518,7 +524,7 @@ class MainController:
         if not sql:
 
 
-            QMessageBox.information(self.view, "ChÆ°a cÃ³ SQL", "KhÃ´ng cÃ³ Suggested Query Ä‘á»ƒ copy.")
+            QMessageBox.information(self.view, "Chưa có SQL", "Không có Suggested Query để copy.")
 
 
             return
@@ -527,7 +533,7 @@ class MainController:
         QApplication.clipboard().setText(sql)
 
 
-        self.view.statusBar().showMessage("ÄÃ£ copy SQL.")
+        self.view.statusBar().showMessage("Đã copy SQL.")
 
 
 
@@ -539,7 +545,7 @@ class MainController:
         if self.busy:
 
 
-            QMessageBox.information(self.view, "AI Ä‘ang báº­n", "Vui lÃ²ng Ä‘á»£i thao tÃ¡c hiá»‡n táº¡i hoÃ n táº¥t.")
+            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
 
 
             return
@@ -548,7 +554,7 @@ class MainController:
         if self.database_manager is None or not self.connection_name:
 
 
-            QMessageBox.warning(self.view, "ChÆ°a cÃ³ káº¿t ná»‘i", "KhÃ´ng tÃ¬m tháº¥y káº¿t ná»‘i database Ä‘ang hoáº¡t Ä‘á»™ng.")
+            QMessageBox.warning(self.view, "Chưa có kết nối", "Không tìm thấy kết nối database đang hoạt động.")
 
 
             return
@@ -563,7 +569,7 @@ class MainController:
         if not sql:
 
 
-            QMessageBox.information(self.view, "ChÆ°a cÃ³ SQL", "KhÃ´ng cÃ³ Suggested Query Ä‘á»ƒ execute.")
+            QMessageBox.information(self.view, "Chưa có SQL", "Không có Suggested Query để execute.")
 
 
             return
@@ -572,7 +578,7 @@ class MainController:
         if not QueryValidator.is_readonly_select(sql):
 
 
-            QMessageBox.warning(self.view, "SQL khÃ´ng an toÃ n", "Chá»‰ cho phÃ©p thá»±c thi cÃ¢u SELECT.")
+            QMessageBox.warning(self.view, "SQL không an toàn", "Chỉ cho phép thực thi câu SELECT.")
 
 
             return
@@ -584,10 +590,10 @@ class MainController:
         self._start_task(
 
 
-            "Äang xá»­ lÃ½ dá»¯ liá»‡u...",
+            "Đang xử lý dữ liệu...",
 
 
-            "Äang thá»±c thi SELECT vÃ  táº£i Query Results.",
+            "Đang thực thi SELECT và tải Query Results.",
 
 
             lambda: self.database_manager.execute_select(sql, self.connection_name),
@@ -608,7 +614,7 @@ class MainController:
         if not result.ok:
 
 
-            QMessageBox.warning(self.view, "Execute tháº¥t báº¡i", result.message)
+            QMessageBox.warning(self.view, "Execute thất bại", result.message)
 
 
             self.view.statusBar().showMessage(result.message)
@@ -625,7 +631,39 @@ class MainController:
     def clear_chat_history(self) -> None:
         self.assistant_history = []
         self.view.clear_chat()
-        self.view.statusBar().showMessage("ÄÃ£ xÃ³a lá»‹ch sá»­ phiÃªn chat Ä‘á»ƒ giáº£i phÃ³ng ngá»¯ cáº£nh.")
+        self.view.statusBar().showMessage("Đã xóa lịch sử phiên chat để giải phóng ngữ cảnh.")
+
+    def refresh_sample_values(self) -> None:
+        if self.busy:
+            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
+            return
+        if self.database_manager is None or not self.connection_name:
+            QMessageBox.warning(self.view, "Chưa có kết nối", "Không tìm thấy kết nối database đang hoạt động.")
+            return
+        if not self.tables:
+            self.load_schema()
+
+        service = SchemaMetadataService()
+        connection = self.database_manager.database(self.connection_name)
+
+        def operation() -> list[str]:
+            service.import_tables(self.profile.name, self.tables)
+            return service.refresh_sample_values(self.profile.name, connection, limit=3)
+
+        self._start_task(
+            "Đang lấy sample values...",
+            "Chỉ chạy SELECT để đọc tối đa 3 giá trị mẫu cho mỗi cột.",
+            operation,
+            self._handle_sample_refresh_result,
+        )
+
+    def _handle_sample_refresh_result(self, messages: list[str]) -> None:
+        if messages:
+            self.view.statusBar().showMessage(f"Đã cập nhật sample values, {len(messages)} cột có lỗi.")
+            QMessageBox.warning(self.view, "Sample values", "\n".join(messages[:10]))
+            return
+        self.view.statusBar().showMessage("Đã cập nhật sample values vào metadata local.")
+
 
     def open_history(self) -> None:
 
@@ -669,10 +707,12 @@ class MainController:
             return
 
 
-        self.view.set_ai_model_config(dialog.config())
+        config = dialog.config()
+        self.view.set_ai_model_config(config)
+        self._apply_cpu_limit(config)
 
 
-        self.view.statusBar().showMessage("ÄÃ£ cáº­p nháº­t AI settings. Báº¥m Load Ä‘á»ƒ Ã¡p dá»¥ng.")
+        self.view.statusBar().showMessage("Đã cập nhật AI settings. Bấm Load để áp dụng.")
 
 
 
@@ -684,7 +724,7 @@ class MainController:
         if self.busy:
 
 
-            QMessageBox.information(self.view, "AI Ä‘ang báº­n", "Vui lÃ²ng Ä‘á»£i thao tÃ¡c hiá»‡n táº¡i hoÃ n táº¥t.")
+            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
 
 
             return
@@ -702,7 +742,7 @@ class MainController:
             self.view.set_model_status(validation_error, False)
 
 
-            QMessageBox.warning(self.view, "Load AI tháº¥t báº¡i", validation_error)
+            QMessageBox.warning(self.view, "Load AI thất bại", validation_error)
 
 
             return
@@ -711,12 +751,14 @@ class MainController:
 
 
 
+        self._apply_cpu_limit(config)
+
         self._start_task(
             "Loading AI...",
-            "Äang load model GGUF local." if config.backend.value == "local" else "Äang kiá»ƒm tra cáº¥u hÃ¬nh API AI.",
+            "Đang load model GGUF local." if config.backend.value == "local" else "Đang kiểm tra cấu hình API AI.",
             lambda: self.ai_engine.load(config, check_cancelled=self._is_task_cancelled),
             self._handle_load_result,
-            on_failed=lambda err: self.view.set_model_status(f"Load model tháº¥t báº¡i: {err}", False)
+            on_failed=lambda err: self.view.set_model_status(f"Load model thất bại: {err}", False)
         )
 
 
@@ -732,7 +774,7 @@ class MainController:
         if not result.ok:
 
 
-            QMessageBox.warning(self.view, "Load AI tháº¥t báº¡i", result.message)
+            QMessageBox.warning(self.view, "Load AI thất bại", result.message)
 
 
 
@@ -744,7 +786,7 @@ class MainController:
         if self.busy:
 
 
-            QMessageBox.information(self.view, "AI Ä‘ang báº­n", "Vui lÃ²ng Ä‘á»£i thao tÃ¡c hiá»‡n táº¡i hoÃ n táº¥t.")
+            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
 
 
             return
@@ -753,7 +795,7 @@ class MainController:
         self.ai_engine.unload()
 
 
-        self.view.set_model_status("AI Ä‘Ã£ unload", False)
+        self.view.set_model_status("AI đã unload", False)
 
 
 
@@ -771,7 +813,7 @@ class MainController:
             if not model_path_text:
 
 
-                return "Vui lÃ²ng chá»n file model GGUF trÆ°á»›c khi báº¥m Load."
+                return "Vui lòng chọn file model GGUF trước khi bấm Load."
 
 
             model_path = Path(model_path_text)
@@ -780,13 +822,13 @@ class MainController:
             if model_path.suffix.lower() != ".gguf":
 
 
-                return "Vui lÃ²ng chá»n file model Ä‘á»‹nh dáº¡ng .gguf."
+                return "Vui lòng chọn file model định dạng .gguf."
 
 
             if not model_path.exists():
 
 
-                return "File model khÃ´ng tá»“n táº¡i."
+                return "File model không tồn tại."
 
 
             return ""
@@ -798,19 +840,36 @@ class MainController:
         if not config.api_endpoint.strip():
 
 
-            return "Vui lÃ²ng nháº­p API endpoint."
+            return "Vui lòng nhập API endpoint."
 
 
         if not config.api_model.strip():
 
 
-            return "Vui lÃ²ng nháº­p API model."
+            return "Vui lòng nhập API model."
 
 
         return ""
 
 
+    def _apply_cpu_limit(self, config: AIModelConfig) -> None:
+        try:
+            message = CpuLimiter.apply(getattr(config, "cpu_thread_limit", 0))
+            self.view.statusBar().showMessage(message)
+        except OSError as exc:
+            self.view.statusBar().showMessage(f"Không thể giới hạn CPU cho app: {exc}")
 
+
+
+
+
+    def _self_correction_retries(self) -> int:
+        try:
+            config = self.view.ai_model_config()
+        except AttributeError:
+            return 3
+        retries = getattr(config, "self_correction_retries", 3)
+        return max(1, min(int(retries or 3), 5))
 
 
     def _start_task(
@@ -894,16 +953,16 @@ class MainController:
             else:
 
 
-                if message in ("Cancelled", "Thao tÃ¡c bá»‹ há»§y", "cancelled", "CancelledError"):
+                if message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError"):
 
 
-                    self.view.statusBar().showMessage("ÄÃ£ há»§y thao tÃ¡c.")
+                    self.view.statusBar().showMessage("Đã hủy thao tác.")
 
 
                     return
 
 
-                QMessageBox.warning(self.view, "Sinh SQL tháº¥t báº¡i", message)
+                QMessageBox.warning(self.view, "Sinh SQL thất bại", message)
 
 
                 self.view.statusBar().showMessage(message)
@@ -1020,7 +1079,7 @@ class MainController:
         self.task_cancelled = True
 
 
-        self.view.statusBar().showMessage("Äang há»§y thao tÃ¡c...")
+        self.view.statusBar().showMessage("Đang hủy thao tác...")
 
 
 
@@ -1053,5 +1112,5 @@ class MainController:
                 self._clear_worker()
 
 
-                self.view.statusBar().showMessage("ÄÃ£ há»§y thao tÃ¡c.")
+                self.view.statusBar().showMessage("Đã hủy thao tác.")
 

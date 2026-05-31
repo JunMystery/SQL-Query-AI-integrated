@@ -96,10 +96,12 @@ class AIModelConfig:
     local_model_path: str = ""
     api_endpoint: str = ""
     api_model: str = ""
-    context_size: int = 4096
+    context_size: int = 2048
     max_tokens: int = 512
-    threads: int = 4
+    threads: int = 2
     gpu_layers: int = 0
+    cpu_thread_limit: int = 4
+    self_correction_retries: int = 3
 
 
 

@@ -15,5 +15,6 @@ __pycache__/
 /build/
 /dist/
 /data/security/
+/logs/
 **/__init__.py
 *.log

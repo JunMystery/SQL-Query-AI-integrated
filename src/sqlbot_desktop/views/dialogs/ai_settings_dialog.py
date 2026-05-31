@@ -41,7 +41,15 @@ class AISettingsDialog(QDialog):
         self.context_size_spin = QSpinBox()
         self.max_tokens_spin = QSpinBox()
         self.threads_spin = QSpinBox()
+        self.cpu_limit_spin = QSpinBox()
+        self.self_correction_spin = QSpinBox()
         self.gpu_layers_spin = QSpinBox()
+        self.threads_label = QLabel("Luồng suy luận LLM")
+        self.threads_hint = QLabel(
+            "Thiết lập này là số worker thread llama.cpp dùng khi suy luận GGUF, "
+            "không phải giới hạn % CPU hoặc khóa đúng từng core CPU. "
+            "Giảm xuống 1-2 nếu model local làm CPU quá cao."
+        )
         self.model_info = QLabel("")
         self.resource_info = QLabel("")
         self.test_output = QTextEdit()
@@ -64,6 +72,8 @@ class AISettingsDialog(QDialog):
             max_tokens=self.max_tokens_spin.value(),
             threads=self.threads_spin.value(),
             gpu_layers=self.gpu_layers_spin.value(),
+            cpu_thread_limit=self.cpu_limit_spin.value(),
+            self_correction_retries=self.self_correction_spin.value(),
         )
 
     def set_config(self, config: AIModelConfig) -> None:
@@ -72,10 +82,12 @@ class AISettingsDialog(QDialog):
         self.model_path_input.setText(config.local_model_path)
         self.api_endpoint_input.setText(config.api_endpoint)
         self.api_model_input.setText(config.api_model)
-        self.context_size_spin.setValue(config.context_size or 4096)
+        self.context_size_spin.setValue(config.context_size or 2048)
         self.max_tokens_spin.setValue(config.max_tokens or 512)
-        self.threads_spin.setValue(config.threads or 4)
+        self.threads_spin.setValue(config.threads or 2)
         self.gpu_layers_spin.setValue(getattr(config, "gpu_layers", 0))
+        self.cpu_limit_spin.setValue(getattr(config, "cpu_thread_limit", 4))
+        self.self_correction_spin.setValue(getattr(config, "self_correction_retries", 3))
         self._select_model_path(config.local_model_path)
         self._refresh_model_info()
 
@@ -112,7 +124,7 @@ class AISettingsDialog(QDialog):
 
         self.context_size_spin.setRange(256, 32768)
         self.context_size_spin.setSingleStep(256)
-        self.context_size_spin.setValue(4096)
+        self.context_size_spin.setValue(2048)
         self.context_size_spin.setAccessibleName("Context size limit")
 
         self.max_tokens_spin.setRange(64, 8192)
@@ -122,8 +134,33 @@ class AISettingsDialog(QDialog):
 
         self.threads_spin.setRange(1, 32)
         self.threads_spin.setSingleStep(1)
-        self.threads_spin.setValue(4)
-        self.threads_spin.setAccessibleName("CPU threads count")
+        self.threads_spin.setValue(2)
+        self.threads_spin.setAccessibleName("Số luồng suy luận LLM")
+        self.threads_spin.setToolTip(
+            "Số worker thread llama.cpp dùng khi suy luận GGUF local. "
+            "Đây không phải giới hạn phần trăm CPU hoặc số core CPU được giữ riêng."
+        )
+        self.threads_spin.valueChanged.connect(lambda _: self._refresh_model_info())
+        self.threads_label.setToolTip(self.threads_spin.toolTip())
+
+        self.cpu_limit_spin.setRange(0, 64)
+        self.cpu_limit_spin.setSingleStep(1)
+        self.cpu_limit_spin.setValue(4)
+        self.cpu_limit_spin.setAccessibleName("Giới hạn logical CPU cho app")
+        self.cpu_limit_spin.setSpecialValueText("Không giới hạn")
+        self.cpu_limit_spin.setToolTip(
+            "Giới hạn CPU affinity của toàn bộ app. 0 nghĩa là không giới hạn; "
+            "4 phù hợp laptop i5 gen 11, RAM 16GB, không VGA rời."
+        )
+        self.cpu_limit_spin.valueChanged.connect(lambda _: self._refresh_model_info())
+
+        self.self_correction_spin.setRange(1, 5)
+        self.self_correction_spin.setSingleStep(1)
+        self.self_correction_spin.setValue(3)
+        self.self_correction_spin.setAccessibleName("So lan tu sua SQL")
+        self.self_correction_spin.setToolTip(
+            "So lan toi da AI sinh lai SQL khi SELECT bi loi execution. Mac dinh 3."
+        )
 
         self.gpu_layers_spin.setRange(0, 200)
         self.gpu_layers_spin.setSingleStep(1)
@@ -134,12 +171,19 @@ class AISettingsDialog(QDialog):
         token_layout.addWidget(self.context_size_spin, 1)
         token_layout.addWidget(QLabel("Max Tokens (max_tokens)"))
         token_layout.addWidget(self.max_tokens_spin, 1)
-        token_layout.addWidget(QLabel("Threads (luồng)"))
+        token_layout.addWidget(self.threads_label)
         token_layout.addWidget(self.threads_spin, 1)
+        token_layout.addWidget(QLabel("CPU Limit"))
+        token_layout.addWidget(self.cpu_limit_spin, 1)
+        token_layout.addWidget(QLabel("Self-Correct"))
+        token_layout.addWidget(self.self_correction_spin, 1)
         token_layout.addWidget(QLabel("GPU Layers"))
         token_layout.addWidget(self.gpu_layers_spin, 1)
 
         layout.addWidget(token_panel)
+        self.threads_hint.setObjectName("formHint")
+        self.threads_hint.setWordWrap(True)
+        layout.addWidget(self.threads_hint)
 
         self.test_output.setReadOnly(True)
         self.test_output.setFixedHeight(86)
@@ -270,7 +314,13 @@ class AISettingsDialog(QDialog):
     def _resource_summary(self, model_size_gb: float | None = None) -> str:
         cpu = os.cpu_count() or 1
         ram_gb = self._total_ram_gb()
-        parts = [f"CPU cores: {cpu}"]
+        cpu_limit = self.cpu_limit_spin.value()
+        limit_text = "không giới hạn" if cpu_limit == 0 else str(min(cpu_limit, cpu))
+        parts = [
+            f"Logical CPU: {cpu}",
+            f"Luồng suy luận LLM: {self.threads_spin.value()}",
+            f"Giới hạn app: {limit_text}",
+        ]
         if ram_gb:
             parts.append(f"RAM: {ram_gb:.1f} GB")
         if model_size_gb is not None and ram_gb:

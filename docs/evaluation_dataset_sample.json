@@ -1,18 +1,53 @@
 {
   "cases": [
     {
-      "id": "users_001",
+      "id": "simple_select_001",
       "question": "Liệt kê tên người dùng",
       "expected_sql": "SELECT full_name FROM users;",
       "dialect": "MYSQL",
-      "notes": "Ví dụ dry-run không chứa secret hoặc password."
+      "notes": "simple select"
     },
     {
-      "id": "orders_001",
-      "question": "Tính tổng doanh thu",
-      "expected_sql": "SELECT SUM(total_amount) FROM orders;",
+      "id": "filter_status_001",
+      "question": "Liệt kê người dùng đang hoạt động",
+      "expected_sql": "SELECT id, full_name FROM users WHERE status = 'active';",
       "dialect": "MYSQL",
-      "notes": "Dùng để kiểm tra exact match/valid SELECT."
+      "notes": "filter by status"
+    },
+    {
+      "id": "join_001",
+      "question": "Liệt kê tên khách hàng và mã đơn hàng của họ",
+      "expected_sql": "SELECT c.full_name, o.id FROM customers c JOIN orders o ON o.customer_id = c.id;",
+      "dialect": "MYSQL",
+      "notes": "join"
+    },
+    {
+      "id": "aggregate_001",
+      "question": "Tính tổng doanh thu",
+      "expected_sql": "SELECT SUM(total_amount) AS total_revenue FROM orders;",
+      "dialect": "MYSQL",
+      "notes": "aggregate"
+    },
+    {
+      "id": "group_by_001",
+      "question": "Đếm số đơn hàng theo trạng thái",
+      "expected_sql": "SELECT status, COUNT(*) AS order_count FROM orders GROUP BY status;",
+      "dialect": "MYSQL",
+      "notes": "group by"
+    },
+    {
+      "id": "order_by_001",
+      "question": "Liệt kê 10 đơn hàng có tổng tiền cao nhất",
+      "expected_sql": "SELECT id, total_amount FROM orders ORDER BY total_amount DESC LIMIT 10;",
+      "dialect": "MYSQL",
+      "notes": "order by and limit"
+    },
+    {
+      "id": "date_filter_001",
+      "question": "Liệt kê đơn hàng tạo trong tháng 5 năm 2026",
+      "expected_sql": "SELECT id, created_at, total_amount FROM orders WHERE created_at >= '2026-05-01' AND created_at < '2026-06-01';",
+      "dialect": "MYSQL",
+      "notes": "date filter"
     }
   ]
 }
