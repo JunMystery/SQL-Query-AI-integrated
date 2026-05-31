@@ -1,650 +1,307 @@
-# Kế hoạch chi tiết: 4.4 - Hoàn thiện vòng lặp tự sửa lỗi (Self-Correction)
+## Key Technical Implementation Points – Full SELECT Capability Upgrade
 
-## 1. Mục tiêu
-
-Xây dựng vòng lặp tự động trong đó AI Agent:
-1. Sinh câu lệnh SQL từ câu hỏi.
-2. Thực thi câu lệnh (chỉ SELECT) và bắt lỗi.
-3. Nếu có lỗi → đưa thông báo lỗi vào prompt → yêu cầu model sửa.
-4. Lặp lại tối đa N lần (mặc định 3).
-5. Trả về kết quả thành công hoặc thông báo thất bại.
+This document outlines the core technical implementations required to upgrade the AI Agent so it can autonomously generate **complete SELECT statements** supporting all standard SQL constructs: `BETWEEN`, `IN`, `JOIN`, subqueries, set operations, aggregations, and more. No project timelines or deadlines are imposed – only functional and architectural specifications.
 
 ---
 
-## 2. Phân tích hiện trạng trong repo
+### 1. Schema Understanding & Relationship Mapping
 
-### 2.1. Những gì đã có
+The agent must first understand the database structure to generate correct queries involving multiple tables and complex filters.
 
-Trong `services/text_to_sql_pipeline.py`, hiện tại đã có:
+#### 1.1 Metadata Extraction
+- Use `SQLAlchemy`’s introspection API to extract:
+  - Table names, column names, data types, nullability
+  - Primary keys and foreign keys
+  - Indexes, constraints, and column comments (if available)
+- Store extracted metadata in an in‑memory graph structure.
 
-```python
-class TextToSqlPipeline:
-    def generate_sql(self, question: str, db_connection=None, 
-                     error_message: str = None, max_retries: int = 3):
-        # Đã có tham số error_message và max_retries
-        # Nhưng chưa có cơ chế tự động thực thi và bắt lỗi
-```
+#### 1.2 Relationship Graph Construction
+- Build a directed graph where:
+  - Nodes = tables
+  - Edges = foreign key relationships (direction from referencing to referenced table)
+- Annotate edges with join condition templates (e.g., `left_table.column = right_table.column`).
+- Support composite foreign keys (multiple columns).
 
-**Vấn đề**: 
-- `error_message` phải được truyền từ bên ngoài.
-- Không có vòng lặp tự động gọi lại `generate_sql` khi có lỗi.
-- Không có module thực thi SQL an toàn trong pipeline.
-
-### 2.2. Những gì cần thêm
-
-1. **SQL Executor an toàn** (chỉ SELECT, bắt exception).
-2. **Vòng lặp tự động** trong `TextToSqlPipeline`.
-3. **Tích hợp với AI Engine** để regenerate khi có lỗi.
-4. **Logging và monitoring** để debug.
-
----
-
-## 3. Chi tiết các bước thực hiện
-
-### Bước 4.4.1: Tạo module SQL Executor an toàn
-
-**File**: `services/sql_executor.py` (mới)
-
-```python
-"""
-SQL Executor - Chỉ cho phép SELECT statements
-"""
-import re
-from typing import Dict, Any, List, Tuple
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
-import logging
-
-logger = logging.getLogger(__name__)
-
-class SafeSQLExecutor:
-    """Thực thi SQL an toàn, chỉ cho phép SELECT"""
-    
-    def __init__(self, connection_string: str):
-        """
-        Args:
-            connection_string: SQLAlchemy connection string
-        """
-        self.engine = create_engine(connection_string)
-        self.forbidden_keywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 
-                                   'ALTER', 'CREATE', 'TRUNCATE', 'MERGE']
-    
-    def validate_sql(self, sql: str) -> Tuple[bool, str]:
-        """
-        Kiểm tra câu lệnh SQL có an toàn không
-        
-        Returns:
-            (is_valid, error_message)
-        """
-        sql_upper = sql.strip().upper()
-        
-        # Chỉ cho phép SELECT
-        if not sql_upper.startswith('SELECT'):
-            return False, "Only SELECT queries are allowed"
-        
-        # Kiểm tra từ khóa nguy hiểm
-        for keyword in self.forbidden_keywords:
-            if re.search(rf'\b{keyword}\b', sql_upper):
-                return False, f"Forbidden keyword detected: {keyword}"
-        
-        return True, ""
-    
-    def execute(self, sql: str) -> Dict[str, Any]:
-        """
-        Thực thi câu lệnh SELECT
-        
-        Args:
-            sql: Câu lệnh SQL (phải bắt đầu bằng SELECT)
-            
-        Returns:
-            Dictionary với keys: 'success', 'data', 'error', 'columns'
-        """
-        # Validate
-        is_valid, error_msg = self.validate_sql(sql)
-        if not is_valid:
-            return {
-                'success': False,
-                'error': error_msg,
-                'data': None,
-                'columns': []
-            }
-        
-        # Execute
-        try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(sql))
-                rows = result.fetchall()
-                columns = list(result.keys())
-                
-                # Convert rows to list of dicts hoặc list of lists
-                data = [dict(zip(columns, row)) for row in rows]
-                
-                return {
-                    'success': True,
-                    'error': None,
-                    'data': data,
-                    'columns': columns,
-                    'row_count': len(data)
-                }
-        except SQLAlchemyError as e:
-            error_msg = str(e)
-            logger.error(f"SQL execution error: {error_msg}\nSQL: {sql}")
-            return {
-                'success': False,
-                'error': error_msg,
-                'data': None,
-                'columns': []
-            }
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            logger.error(error_msg)
-            return {
-                'success': False,
-                'error': error_msg,
-                'data': None,
-                'columns': []
-            }
-```
-
-### Bước 4.4.2: Cập nhật TextToSqlPipeline
-
-**File**: `services/text_to_sql_pipeline.py` (sửa)
-
-```python
-from services.sql_executor import SafeSQLExecutor
-from typing import Optional, Dict, Any
-import logging
-
-logger = logging.getLogger(__name__)
-
-class TextToSqlPipeline:
-    def __init__(self, db_connector, ai_engine, embedding_model=None, 
-                 use_neural_embedding=True, max_retries=3):
-        # ... existing code ...
-        self.max_retries = max_retries
-        self.sql_executor = None  # Will be initialized when DB connected
-        
-    def set_database_connection(self, connection_string: str):
-        """Thiết lập kết nối database và SQL executor"""
-        self.sql_executor = SafeSQLExecutor(connection_string)
-        
-    def execute_with_self_correction(self, question: str, 
-                                     connection_string: str,
-                                     max_retries: Optional[int] = None) -> Dict[str, Any]:
-        """
-        Thực thi pipeline với vòng lặp tự sửa lỗi
-        
-        Args:
-            question: Câu hỏi bằng ngôn ngữ tự nhiên
-            connection_string: Kết nối database
-            max_retries: Số lần thử tối đa (mặc định = self.max_retries)
-            
-        Returns:
-            Dictionary với keys:
-                - success: bool
-                - sql: str (câu lệnh cuối cùng)
-                - result: data (nếu success)
-                - error: str (nếu thất bại)
-                - attempts: int (số lần đã thử)
-                - error_history: list (các lỗi gặp phải)
-        """
-        if max_retries is None:
-            max_retries = self.max_retries
-            
-        # Khởi tạo SQL executor
-        self.set_database_connection(connection_string)
-        
-        error_history = []
-        last_error = None
-        
-        for attempt in range(max_retries):
-            logger.info(f"Attempt {attempt + 1}/{max_retries} for question: {question[:50]}...")
-            
-            # Bước 1: Generate SQL (có thể có error_message từ lần trước)
-            try:
-                sql = self.generate_sql(
-                    question=question,
-                    error_message=last_error,
-                    max_retries=1  # Chỉ generate 1 lần trong vòng lặp này
-                )
-            except Exception as e:
-                error_msg = f"SQL generation failed: {str(e)}"
-                logger.error(error_msg)
-                error_history.append(error_msg)
-                last_error = error_msg
-                continue
-            
-            # Bước 2: Validate và execute
-            if not sql:
-                error_msg = "Generated SQL is empty"
-                error_history.append(error_msg)
-                last_error = error_msg
-                continue
-            
-            logger.debug(f"Generated SQL: {sql}")
-            
-            # Bước 3: Thực thi
-            exec_result = self.sql_executor.execute(sql)
-            
-            if exec_result['success']:
-                # Thành công
-                return {
-                    'success': True,
-                    'sql': sql,
-                    'result': exec_result['data'],
-                    'columns': exec_result['columns'],
-                    'row_count': exec_result['row_count'],
-                    'attempts': attempt + 1,
-                    'error_history': error_history
-                }
-            else:
-                # Thất bại - lưu lỗi để retry
-                error_msg = exec_result['error']
-                error_history.append(error_msg)
-                last_error = error_msg
-                logger.warning(f"Attempt {attempt + 1} failed: {error_msg}")
-                
-                # Tiếp tục vòng lặp
-        
-        # Hết số lần thử
-        return {
-            'success': False,
-            'sql': None,
-            'result': None,
-            'error': f"Failed after {max_retries} attempts. Last error: {last_error}",
-            'attempts': max_retries,
-            'error_history': error_history
-        }
-    
-    def generate_sql(self, question: str, error_message: str = None, 
-                     max_retries: int = 1) -> str:
-        """
-        Sinh câu lệnh SQL (có thể có error_message từ lần trước)
-        
-        Args:
-            question: Câu hỏi
-            error_message: Thông báo lỗi từ lần thực thi trước (nếu có)
-            max_retries: Số lần generate tối đa (mặc định 1)
-        """
-        # Existing code for schema linking, prompt building, etc.
-        # ...
-        
-        # Xây dựng prompt (có error_message nếu có)
-        prompt = self.prompt_builder.build_prompt(
-            question=question,
-            schema_subset=schema_subset,
-            few_shot_examples=self.get_few_shot_examples(question),
-            error_message=error_message  # Quan trọng: truyền lỗi vào prompt
-        )
-        
-        # Gọi AI Engine
-        sql = self.ai_engine.generate(prompt)
-        
-        # Trích xuất SQL từ response (nếu cần)
-        sql = self.extract_sql_from_response(sql)
-        
-        return sql
-    
-    def extract_sql_from_response(self, response: str) -> str:
-        """Trích xuất câu lệnh SQL từ response của model"""
-        import re
-        
-        # Tìm code block SQL
-        sql_pattern = r'```sql\n(.*?)\n```'
-        match = re.search(sql_pattern, response, re.DOTALL | re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
-        
-        # Nếu không có code block, tìm dòng bắt đầu bằng SELECT
-        lines = response.strip().split('\n')
-        for line in lines:
-            if line.strip().upper().startswith('SELECT'):
-                return line.strip()
-        
-        # Trả về toàn bộ response (có thể là SQL)
-        return response.strip()
-```
-
-### Bước 4.4.3: Cập nhật PromptBuilder để hỗ trợ error message
-
-**File**: `services/prompt_builder.py` (sửa)
-
-```python
-class PromptBuilder:
-    def __init__(self):
-        self.default_system_prompt = """You are an expert SQL generator. Generate ONLY a valid SELECT SQL statement for the given schema. Do not include any explanation."""
-        
-        # Template cho error correction
-        self.error_correction_template = """
-The previous SQL query failed with the following error:
-{error_message}
-
-Please correct the SQL query. Make sure to:
-1. Check table and column names (they must exist in the schema)
-2. Verify data types in conditions
-3. Ensure JOIN conditions are correct
-4. Remove any syntax errors
-
-Generate ONLY the corrected SELECT SQL statement.
-"""
-    
-    def build_prompt(self, question: str, schema_subset, 
-                     few_shot_examples=None, error_message=None,
-                     use_skeleton=False) -> str:
-        """Xây dựng prompt hoàn chỉnh"""
-        
-        parts = []
-        
-        # System prompt
-        if use_skeleton:
-            parts.append(self.skeleton_system_prompt)
-        else:
-            parts.append(self.default_system_prompt)
-        
-        # Schema
-        parts.append("\n\n## Database Schema:")
-        parts.append(self.format_schema(schema_subset))
-        
-        # Few-shot examples
-        if few_shot_examples:
-            parts.append("\n\n## Examples:")
-            for ex in few_shot_examples:
-                parts.append(f"Question: {ex['question']}")
-                parts.append(f"SQL: {ex['sql']}")
-        
-        # Error message (nếu có) - QUAN TRỌNG CHO SELF-CORRECTION
-        if error_message:
-            parts.append("\n\n## Error Correction Required:")
-            parts.append(self.error_correction_template.format(error_message=error_message))
-        
-        # Current question
-        parts.append(f"\n\n## Question: {question}")
-        parts.append("SQL:")
-        
-        return "\n".join(parts)
-```
-
-### Bước 4.4.4: Cập nhật AI Engine để hỗ trợ regenerate
-
-**File**: `services/ai_engine.py` (thêm method)
-
-```python
-class AIEngine:
-    # ... existing code ...
-    
-    def generate_with_retry(self, prompt: str, max_retries: int = 1) -> str:
-        """
-        Generate với khả năng retry nếu kết quả rỗng hoặc không hợp lệ
-        """
-        for attempt in range(max_retries):
-            result = self.generate(prompt)
-            if result and len(result.strip()) > 0:
-                # Kiểm tra sơ bộ: có chứa SELECT không?
-                if 'SELECT' in result.upper():
-                    return result
-                elif attempt == max_retries - 1:
-                    # Lần cuối, vẫn trả về dù không có SELECT
-                    return result
-            # Chờ một chút nếu cần (cho API)
-            if attempt < max_retries - 1:
-                import time
-                time.sleep(0.5)
-        return ""
-```
-
-### Bước 4.4.5: Tích hợp vào Controller (UI)
-
-**File**: `controllers/query_controller.py` (sửa)
-
-```python
-class QueryController:
-    def __init__(self):
-        self.pipeline = None
-        self.current_connection = None
-    
-    def execute_natural_language_query(self, question: str, db_config: dict) -> dict:
-        """
-        Xử lý câu hỏi từ UI với self-correction
-        """
-        try:
-            # Tạo connection string từ config
-            conn_string = self.build_connection_string(db_config)
-            
-            # Khởi tạo pipeline nếu chưa có
-            if not self.pipeline:
-                self.pipeline = TextToSqlPipeline(
-                    db_connector=...,
-                    ai_engine=self.ai_engine,
-                    max_retries=3  # Mặc định 3 lần
-                )
-            
-            # Thực thi với self-correction
-            result = self.pipeline.execute_with_self_correction(
-                question=question,
-                connection_string=conn_string
-            )
-            
-            # Log kết quả
-            if result['success']:
-                logger.info(f"Success after {result['attempts']} attempts")
-                if result['attempts'] > 1:
-                    logger.info(f"Error history: {result['error_history']}")
-            else:
-                logger.error(f"Failed after {result['attempts']} attempts: {result['error']}")
-            
-            return result
-            
-        except Exception as e:
-            logger.exception("Unexpected error in query execution")
-            return {
-                'success': False,
-                'error': f"System error: {str(e)}",
-                'sql': None,
-                'result': None
-            }
-```
-
-### Bước 4.4.6: Thêm logging và monitoring
-
-**File**: `utils/query_logger.py` (mới)
-
-```python
-"""
-Query logging để debug self-correction
-"""
-import json
-from datetime import datetime
-from pathlib import Path
-import logging
-
-class QueryLogger:
-    def __init__(self, log_dir="logs/queries"):
-        self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.logger = logging.getLogger(__name__)
-    
-    def log_query_attempt(self, question: str, attempt: int, 
-                          sql: str, error: str = None, 
-                          success: bool = False):
-        """Ghi lại mỗi lần thử"""
-        log_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'question': question,
-            'attempt': attempt,
-            'sql': sql,
-            'error': error,
-            'success': success
-        }
-        
-        # Lưu vào file JSON
-        log_file = self.log_dir / f"{datetime.now().strftime('%Y%m%d')}.json"
-        with open(log_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
-        
-        # Log vào console
-        if success:
-            self.logger.info(f"Attempt {attempt} SUCCESS")
-        else:
-            self.logger.warning(f"Attempt {attempt} FAILED: {error}")
-    
-    def get_statistics(self, days=7):
-        """Thống kê tỷ lệ thành công của self-correction"""
-        # Implementation để phân tích hiệu quả
-        pass
-```
-
-### Bước 4.4.7: Cập nhật configuration
-
-**File**: `config.yaml` (thêm section)
-
-```yaml
-self_correction:
-  enabled: true
-  max_retries: 3
-  log_errors: true
-  retry_delay_seconds: 0.5
-  include_error_in_prompt: true
-  stop_on_syntax_error: false  # Nếu true, dừng ngay khi lỗi syntax
-```
+#### 1.3 Automatic Join Path Discovery
+- Given a set of tables mentioned in the natural language query, compute the minimal join path using graph traversal (BFS).
+- If no direct foreign key exists, suggest plausible join conditions using:
+  - Same column names across tables
+  - Naming conventions (e.g., `user_id` in `orders` referencing `id` in `users`)
+- Allow manual override via configuration.
 
 ---
 
-## 4. Testing
+### 2. SELECT Clause Generation
 
-### 4.1. Unit test cho SQL Executor
+Handle column selection, expressions, aliases, and aggregate functions.
 
-**File**: `tests/test_sql_executor.py`
+#### 2.1 Column Resolution
+- Map natural language column references (e.g., “customer name”, “order total”) to actual columns.
+- Resolve ambiguous references using:
+  - Context from previous clauses (e.g., already determined tables)
+  - Heuristics (most frequently used table for that term)
+  - User disambiguation via UI (if needed)
 
-```python
-import pytest
-from services.sql_executor import SafeSQLExecutor
+#### 2.2 Expressions & Aliases
+- Support arithmetic expressions: `quantity * unit_price AS total`
+- Support string concatenation / date functions based on dialect (e.g., `CONCAT(first_name, ' ', last_name)`).
+- Generate unambiguous aliases automatically when expressions are used.
 
-def test_validate_select():
-    executor = SafeSQLExecutor("sqlite:///:memory:")
-    is_valid, error = executor.validate_sql("SELECT * FROM users")
-    assert is_valid == True
-    assert error == ""
-
-def test_reject_insert():
-    executor = SafeSQLExecutor("sqlite:///:memory:")
-    is_valid, error = executor.validate_sql("INSERT INTO users VALUES (1)")
-    assert is_valid == False
-    assert "INSERT" in error
-
-def test_execute_invalid_sql():
-    executor = SafeSQLExecutor("sqlite:///:memory:")
-    result = executor.execute("SELECT * FROM nonexistent_table")
-    assert result['success'] == False
-    assert "no such table" in result['error'].lower()
-```
-
-### 4.2. Integration test cho self-correction
-
-**File**: `tests/test_self_correction.py`
-
-```python
-def test_self_correction_handles_typo():
-    """Test model tự sửa lỗi chính tả tên cột"""
-    pipeline = TextToSqlPipeline(...)
-    
-    # Câu hỏi có thể dẫn đến lỗi typo
-    result = pipeline.execute_with_self_correction(
-        question="Hiển thị tên khách hàng",
-        connection_string="sqlite:///test.db"
-    )
-    
-    # Kiểm tra đã thử ít nhất 2 lần
-    assert result['attempts'] >= 2
-    assert result['success'] == True
-
-def test_self_correction_max_retries():
-    """Test dừng lại sau max_retries lần thất bại"""
-    pipeline = TextToSqlPipeline(..., max_retries=2)
-    
-    # Giả lập model luôn sinh SQL sai
-    # ...
-    
-    result = pipeline.execute_with_self_correction(...)
-    assert result['success'] == False
-    assert result['attempts'] == 2
-```
+#### 2.3 Aggregate Functions
+- Recognise aggregate keywords: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`, `GROUP_CONCAT`/`STRING_AGG`.
+- When aggregates appear without `GROUP BY`, treat entire result as a single group.
+- When `GROUP BY` is needed, automatically determine grouping columns from non‑aggregated selected columns.
 
 ---
 
-## 5. Triển khai và monitoring
+### 3. WHERE Clause – Full Operator Support
 
-### 5.1. Metrics cần theo dõi
+Extend beyond simple equality/inequality to include all major operators.
 
-Sau khi triển khai, theo dõi các metrics:
+#### 3.1 Operator Detection from Natural Language
+- Build a rule‑based + LLM‑prompted classifier for each operator:
+  - `BETWEEN` : “between … and …”, “from … to …”, “in the range …”
+  - `IN` : “in (list)”, “one of”, “either … or …”
+  - `LIKE` : “contains”, “starts with”, “ends with”, “pattern”, “wildcard”
+  - `EXISTS` : “has at least one”, “there exists”, “where any”
+  - `IS NULL` / `IS NOT NULL` : “is missing”, “has no value”, “is empty”
+- Output a structured condition tree (e.g., `{'operator': 'BETWEEN', 'column': 'price', 'low': 10, 'high': 100}`).
 
-| Metric | Ý nghĩa | Mục tiêu |
-|--------|---------|----------|
-| `success_rate` | Tỷ lệ query thành công sau N lần | >85% |
-| `avg_attempts` | Số lần thử trung bình | <1.5 |
-| `error_types` | Phân loại lỗi (syntax, schema, logic) | Để cải thiện prompt |
-| `correction_rate` | Tỷ lệ lỗi được sửa thành công | >60% |
+#### 3.2 Condition Chaining (AND/OR)
+- Detect logical connectors in the user’s sentence (“and”, “or”, “, but not”).
+- Build a proper parenthesised condition tree to preserve precedence.
+- Allow nested conditions (e.g., `(A OR B) AND C`).
 
-### 5.2. Xử lý edge cases
-
-1. **Lỗi syntax liên tục**: Nếu cùng một lỗi lặp lại, dừng sớm.
-2. **Timeout**: Thêm timeout cho mỗi lần thực thi (30 giây).
-3. **Memory leak**: Giải phóng connection sau mỗi lần thử.
-
-### 5.3. Fallback strategy
-
-Nếu self-correction thất bại sau 3 lần:
-
-```python
-if not result['success']:
-    # Option 1: Trả về câu SQL cuối cùng (dù sai) để người dùng sửa tay
-    # Option 2: Gửi thông báo lỗi chi tiết
-    # Option 3: Gọi một model mạnh hơn qua API (nếu có)
-    return {
-        'fallback_used': True,
-        'suggested_sql': last_sql,
-        'error': last_error
-    }
-```
+#### 3.3 Type-Aware Rendering
+- Render values according to column data type:
+  - Strings wrapped in quotes, escaping internal quotes
+  - Numbers without quotes
+  - Dates/timestamps using dialect‑appropriate literals
+- For `IN` with long lists, consider using `= ANY(...)` for PostgreSQL or `IN` with subqueries.
 
 ---
 
-## 6. Tài liệu hướng dẫn sử dụng
+### 4. JOIN Handling
 
-**File**: `docs/SELF_CORRECTION.md`
+Generate correct JOIN clauses for multi‑table queries.
 
-```markdown
-# Self-Correction Feature
+#### 4.1 Join Type Selection
+- Determine join type based on user intent:
+  - **INNER JOIN** : default, when only matching rows are needed
+  - **LEFT/RIGHT JOIN** : when user says “all records from X, even if no match in Y”
+  - **FULL OUTER JOIN** : “both sides”, “all records from both tables”
+- For ambiguous cases, default to INNER JOIN and allow manual adjustment.
 
-## Cách hoạt động
-1. AI sinh SQL từ câu hỏi
-2. Hệ thống thử chạy SQL
-3. Nếu lỗi → thông báo lỗi được đưa vào prompt
-4. AI sinh lại SQL đã sửa
-5. Lặp lại tối đa 3 lần
+#### 4.2 Condition Generation
+- Use the relationship graph to obtain the correct join condition.
+- If multiple possible join paths exist (e.g., two different foreign keys between tables), ask the user or apply heuristics (most recent / most selective).
+- Support non‑equi joins if needed (e.g., `ON A.start <= B.end`), though these are rare.
 
-## Cấu hình
-Trong Settings → Advanced:
-- Max Retries: 1-5 (mặc định 3)
-- Log Errors: Bật/tắt ghi log
-
-## Best practices
-- Với database lớn, nên bật self-correction
-- Nếu query quá phức tạp, có thể cần retry nhiều hơn
-- Xem log tại `logs/queries/` để debug
-```
+#### 4.3 Table Aliasing
+- Automatically generate short aliases (e.g., `c`, `o`, `p`) to keep SQL readable.
+- Use consistent aliases across the query (avoid conflicts).
 
 ---
 
-## 7. Kết luận
+### 5. Subquery Support
 
-Sau khi hoàn thành plan 4.4, dự án sẽ có:
+Support subqueries in `SELECT`, `FROM`, and `WHERE` clauses.
 
-✅ **Vòng lặp tự động** từ generate → execute → catch error → regenerate.  
-✅ **Safe SQL executor** chỉ cho phép SELECT.  
-✅ **Prompt được cập nhật** với error message để model tự sửa.  
-✅ **Logging chi tiết** để debug và monitoring.  
-✅ **Configurable** qua file YAML.
+#### 5.1 Subquery Intent Detection
+- Phrases indicating a subquery:
+  - “whose average salary is greater than the overall average” → subquery inside `WHERE` or `HAVING`
+  - “companies that have at least one employee earning more than 100k” → `EXISTS` subquery
+  - “the highest paid employee in each department” → correlated subquery
+- Classify into three types:
+  - Scalar subquery (returns one value)
+  - Row subquery (rare)
+  - Table subquery (used in `FROM`)
 
-**Kết quả kỳ vọng**: Giảm 30–40% lỗi thực thi, tăng độ tin cậy tổng thể lên 85%+ cho các câu hỏi phổ biến.
+#### 5.2 Subquery Generation Pipeline
+1. Decompose the main question into two parts: inner and outer.
+2. Generate the inner SQL independently (can reuse the same engine).
+3. Wrap it appropriately (e.g., `WHERE salary > (SELECT AVG(salary) …)`).
+4. Ensure correlation columns are correctly referenced (e.g., `WHERE dept_id = outer.dept_id`).
 
-Bạn có muốn tôi viết script tự động áp dụng các thay đổi này vào repo không?
+#### 5.3 Optimisation & Readability
+- For `NOT IN` subqueries, consider rewriting as `NOT EXISTS` (handles NULLs correctly) – the agent can offer both versions.
+- Flatten simple subqueries into joins when possible for better performance (e.g., `SELECT ... FROM (SELECT ...) AS sub` can often be a join).
+
+---
+
+### 6. GROUP BY & HAVING
+
+Handle grouping and post‑aggregation filtering.
+
+#### 6.1 Automatic GROUP BY Detection
+- When a query contains both aggregate functions and non‑aggregated columns, those non‑aggregated columns become the `GROUP BY` list.
+- If the user explicitly mentions “group by X”, honour that grouping.
+
+#### 6.2 HAVING Clause Generation
+- Detect filter conditions that refer to aggregate results (e.g., “total sales > 10000” after `SUM(sales)`).
+- Move such conditions from `WHERE` to `HAVING`.
+- Combine with regular `WHERE` conditions correctly (WHERE applies before grouping, HAVING after).
+
+#### 6.3 Complex Grouping
+- Support grouping by expressions (e.g., `YEAR(order_date)`).
+- Support `ROLLUP`, `CUBE`, `GROUPING SETS` if explicitly requested (advanced).
+
+---
+
+### 7. ORDER BY, LIMIT, OFFSET
+
+#### 7.1 Sorting
+- Detect ascending/descending intent (“highest first”, “oldest to newest”).
+- Support multiple sort columns (“sort by department, then by salary descending”).
+- For expressions, sort by the expression or its alias.
+
+#### 7.2 Pagination
+- Recognise “top N”, “first N”, “limit N” → generate `LIMIT N`.
+- Recognise “skip N”, “after the first N” → add `OFFSET N`.
+- Dialect handling: SQLite/PostgreSQL use `LIMIT ... OFFSET`, SQL Server uses `OFFSET ... FETCH`, MySQL supports `LIMIT offset, count`.
+
+---
+
+### 8. Set Operations (UNION, INTERSECT, EXCEPT)
+
+#### 8.1 Intent Recognition
+- Phrases: “combine results from A and B” (UNION), “common to both” (INTERSECT), “in A but not in B” (EXCEPT/MINUS).
+- Determine if duplicates should be removed (`UNION` vs `UNION ALL`). Default to `UNION ALL` when user says “include duplicates” or uses “all”.
+
+#### 8.2 Generation Process
+1. Split the user request into two (or more) independent sub‑queries.
+2. Generate each sub‑query separately.
+3. Ensure the same number and compatible types of columns.
+4. Combine them with the appropriate set operator.
+5. Apply a final `ORDER BY` / `LIMIT` on the whole result.
+
+---
+
+### 9. Self‑Correction & Validation
+
+The agent must be able to verify and fix its own SQL.
+
+#### 9.1 Syntax Validation
+- Use `sqlglot` to parse the generated SQL against the target dialect (PostgreSQL, MySQL, SQLite).
+- Capture parse errors and feed them back to the LLM for correction.
+
+#### 9.2 Semantic Validation
+- Execute the query in a test transaction with `ROLLBACK` (safe mode) to detect runtime errors (e.g., column not found, type mismatch, ambiguous column).
+- Parse the database error message, extract the exact problem (e.g., `column "xyz" is ambiguous`), and ask the agent to fix it.
+
+#### 9.3 Result‑Based Correction
+- For queries that execute but return obviously wrong results (e.g., zero rows when expected many, unexpected number of columns), the agent can:
+  - Compare with a simplified manual query (if the user provides one)
+  - Ask clarifying questions to correct the intent
+- Implement an iterative loop: generate → validate → correct → re‑validate (max 3 attempts).
+
+#### 9.4 Performance Validation (optional)
+- Run `EXPLAIN` (or `EXPLAIN ANALYZE`) on the generated query to detect full table scans or missing indexes.
+- Suggest index creation or query rewriting to the user.
+
+---
+
+### 10. Query Optimisation & Rewriting
+
+Improve the quality of generated SQL without changing its semantics.
+
+#### 10.1 Dialect‑Specific Optimisations
+- Convert `IN (SELECT ...)` to `EXISTS` when the subquery is large.
+- Replace `OR` chains with `IN` where applicable.
+- Use `WITH` (CTE) for repeated subqueries to improve readability and performance.
+
+#### 10.2 Join Reordering
+- If the generated SQL has `A JOIN B JOIN C` with a poor join order, reorder based on estimated cardinality (heuristic: smaller table first, or follow foreign key direction).
+
+#### 10.3 Index Recommendations
+- Analyse the `WHERE`, `JOIN`, and `ORDER BY` clauses to identify columns that would benefit from indexing.
+- Generate `CREATE INDEX` statements and present them to the user.
+
+---
+
+### 11. RAG & Few‑Shot Learning for Complex Constructs
+
+To improve accuracy for rare operators (`BETWEEN`, `EXISTS`, set operations), the agent can retrieve similar examples.
+
+#### 11.1 Example Storage
+- Store pairs of (natural language description, SQL query) in a vector database (Chroma, FAISS).
+- Include metadata: database schema fingerprint, operator types used, complexity level.
+
+#### 11.2 Retrieval Augmentation
+- For a new user question, find the top‑k most similar previous questions (cosine similarity on embeddings).
+- Inject the corresponding SQL examples into the LLM prompt as few‑shot demonstrations.
+- This is especially effective for `JOIN` patterns and `GROUP BY` with having.
+
+#### 11.3 Continuous Learning
+- Allow the user to correct generated SQL and store the correction as a new example.
+- Periodically re‑embed and update the vector store.
+
+---
+
+### 12. Multi‑Agent Orchestration (Optional but Recommended)
+
+For very complex queries, split responsibilities among specialised agents.
+
+- **Router Agent** – determines which SQL features are needed (joins, aggregations, subqueries, etc.)
+- **Join Planner Agent** – computes the minimal join path and join types
+- **Filter Agent** – builds the WHERE clause with all operators
+- **Aggregation Agent** – handles GROUP BY and HAVING
+- **Validator Agent** – runs syntax and semantic checks
+- **Assembler Agent** – combines all pieces into final SQL
+
+This decomposition reduces the cognitive load on a single LLM call and improves reliability.
+
+---
+
+### 13. Integration with Existing SQLBot Desktop Application
+
+The new engine must fit seamlessly into the current PySide6 application.
+
+#### 13.1 API / Service Layer
+- Expose the enhanced agent as a Python class `AdvancedSQLAgent` with a method `generate_sql(user_input: str, db_connection) -> str`.
+- Maintain backward compatibility: fallback to simple generation if advanced features not required.
+
+#### 13.2 UI Enhancements (minimal)
+- Add a “Explain SQL” button that shows the agent’s reasoning steps (join path, operator detection, etc.)
+- Display warnings for potential performance issues (e.g., no index on filtered column).
+- Provide a “Simplify” suggestion that rewrites complex SQL into easier form.
+
+#### 13.3 Configuration
+- Allow the user to enable/disable advanced operators (e.g., disable subqueries if the database is very slow).
+- Set per‑database dialect (MySQL, PostgreSQL, SQLite) either automatically from the connection or manually.
+
+---
+
+### 14. Testing & Quality Assurance
+
+To ensure the agent handles all SELECT constructs correctly.
+
+#### 14.1 Unit Test Suite
+- For each operator (`BETWEEN`, `IN`, `JOIN`, etc.), create a set of natural language inputs and expected SQL outputs.
+- Use a lightweight test database (SQLite in memory) with known schema and data.
+
+#### 14.2 Integration Tests
+- Test multi‑clause queries combining joins, aggregations, and subqueries.
+- Verify self‑correction loops by injecting intentional errors.
+
+#### 14.3 Benchmark Against Public Datasets
+- Use the **Spider** or **BIRD** text‑to‑SQL benchmark to measure execution accuracy.
+- Aim for ≥85% exact matching on queries that involve the implemented operators.
+
+---
+
+### Summary of Technical Deliverables
+
+| Component | Implementation Artifact |
+|-----------|------------------------|
+| Schema graph | `schema_graph.py` – builds and queries foreign key relationships |
+| Operator detector | `operator_classifier.py` – rule+LLM based detection of BETWEEN, IN, LIKE, EXISTS |
+| Join planner | `join_planner.py` – minimal join path & join type selection |
+| Subquery engine | `subquery_generator.py` – decomposes and nests queries |
+| Aggregation handler | `grouping_handler.py` – GROUP BY + HAVING logic |
+| Set operation handler | `setop_handler.py` – UNION/INTERSECT/EXCEPT generation |
+| Self‑correction loop | `correction_loop.py` – validate + repair iterations |
+| RAG example store | `example_store.py` – vector DB for few‑shot learning |
+| Multi‑agent orchestrator | `orchestrator.py` – dispatches sub‑tasks to specialised agents |
+
+This technical foundation enables the AI Agent to generate **any valid SELECT statement**, fully covering `BETWEEN`, `IN`, `JOIN`, subqueries, set operations, and all other SQL clauses – without artificial time constraints.

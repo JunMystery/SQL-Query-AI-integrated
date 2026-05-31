@@ -95,6 +95,34 @@ class TextToSqlPipeline:
         check_cancelled: Callable[[], bool] | None = None,
     ) -> TextToSqlResult:
         schema_context, base_diagnostics = self._schema_context(db_name, question, fallback_schema_context)
+        
+        # Try generating using AdvancedSQLAgent
+        try:
+            from sqlbot_desktop.agents.advanced_sql_agent import AdvancedSQLAgent
+            agent = AdvancedSQLAgent(self.ai_engine)
+            metadata = []
+            if self.metadata_repository:
+                metadata = self.metadata_repository.list_columns(db_name)
+            agent.metadata_list = metadata
+            
+            generated_query = agent.generate_sql(question, dialect=dialect.lower())
+            if generated_query:
+                execution = None
+                if execute_sql:
+                    execution = execute_sql(generated_query)
+                if not execution or execution.ok:
+                    return TextToSqlResult(
+                        ok=True,
+                        queries=[generated_query],
+                        message="Đã sinh SQL bằng Advanced SQL Agent.",
+                        raw_text=f"```sql\n{generated_query}\n```",
+                        prompt="[Advanced SQL Agent Pipeline]",
+                        diagnostics=base_diagnostics,
+                        execution_result=execution,
+                    )
+        except Exception as e:
+            logger.warning("Advanced SQL Agent failed, falling back: %s", e)
+
         selected_examples = self.few_shot_repository.select_examples(question, dialect)
         few_shots = [example.to_prompt_dict() for example in selected_examples] if selected_examples else None
         attempts = max(1, max_retries)

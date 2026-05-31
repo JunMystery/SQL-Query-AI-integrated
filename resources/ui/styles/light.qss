@@ -410,6 +410,7 @@ QCheckBox#rememberCheck::indicator {
 QCheckBox#rememberCheck::indicator:checked {
     background: #147a63;
     border-color: #147a63;
+    image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
 }
 
 QPushButton {
