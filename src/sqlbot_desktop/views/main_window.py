@@ -88,6 +88,7 @@ class MainWindow(QMainWindow):
         self.busy_detail_label = QLabel("")
         self.busy_progress = QProgressBar()
         self.question_input = PromptEdit()
+        self.stop_button = QPushButton("Dừng")
         self.chat_view = QTextBrowser()
         self.sql_editor = QTextEdit()
         self.results_dialog = QueryResultsDialog(self)
@@ -96,6 +97,10 @@ class MainWindow(QMainWindow):
         self.schema_dock: QDockWidget | None = None
         self.result_headers: list[str] = []
         self.result_rows: list[list[object]] = []
+        self._context_size = 4096
+        self._max_tokens = 512
+        self._threads = 4
+        self._gpu_layers = 0
 
         self._build_menu()
         self._build_ui()
@@ -301,7 +306,15 @@ class MainWindow(QMainWindow):
         send_button.setObjectName("primaryButton")
         send_button.setMinimumHeight(38)
         send_button.clicked.connect(self._on_send_clicked)
+        
+        self.stop_button.setObjectName("dangerButton")
+        self.stop_button.setMinimumHeight(38)
+        self.stop_button.setFixedWidth(80)
+        self.stop_button.setVisible(False)
+        self.stop_button.clicked.connect(self.cancel_requested.emit)
+        
         prompt_actions.addWidget(send_button)
+        prompt_actions.addWidget(self.stop_button)
         prompt_actions.addStretch()
 
         prompt_column.addWidget(prompt_label)
@@ -414,6 +427,10 @@ class MainWindow(QMainWindow):
             local_model_path=self.model_path_input.text().strip(),
             api_endpoint=self.api_endpoint_input.text().strip(),
             api_model=self.api_model_input.text().strip(),
+            context_size=self._context_size,
+            max_tokens=self._max_tokens,
+            threads=self._threads,
+            gpu_layers=self._gpu_layers,
         )
 
     def set_ai_model_config(self, config: AIModelConfig) -> None:
@@ -423,6 +440,10 @@ class MainWindow(QMainWindow):
         self.model_path_input.setText(config.local_model_path)
         self.api_endpoint_input.setText(config.api_endpoint)
         self.api_model_input.setText(config.api_model)
+        self._context_size = config.context_size or 4096
+        self._max_tokens = config.max_tokens or 512
+        self._threads = config.threads or 4
+        self._gpu_layers = getattr(config, "gpu_layers", 0)
         self._sync_ai_controls()
 
     def set_model_status(self, message: str, loaded: bool = False) -> None:
@@ -436,6 +457,7 @@ class MainWindow(QMainWindow):
         self.busy_title_label.setText(title)
         self.busy_detail_label.setText(detail)
         self.busy_panel.setVisible(active)
+        self.stop_button.setVisible(active)
         self.statusBar().showMessage(title or "Ready")
 
     def set_generated_queries(self, queries: list[str]) -> None:

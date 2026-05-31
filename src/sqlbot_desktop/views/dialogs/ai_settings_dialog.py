@@ -41,6 +41,7 @@ class AISettingsDialog(QDialog):
         self.context_size_spin = QSpinBox()
         self.max_tokens_spin = QSpinBox()
         self.threads_spin = QSpinBox()
+        self.gpu_layers_spin = QSpinBox()
         self.model_info = QLabel("")
         self.resource_info = QLabel("")
         self.test_output = QTextEdit()
@@ -62,6 +63,7 @@ class AISettingsDialog(QDialog):
             context_size=self.context_size_spin.value(),
             max_tokens=self.max_tokens_spin.value(),
             threads=self.threads_spin.value(),
+            gpu_layers=self.gpu_layers_spin.value(),
         )
 
     def set_config(self, config: AIModelConfig) -> None:
@@ -73,6 +75,7 @@ class AISettingsDialog(QDialog):
         self.context_size_spin.setValue(config.context_size or 4096)
         self.max_tokens_spin.setValue(config.max_tokens or 512)
         self.threads_spin.setValue(config.threads or 4)
+        self.gpu_layers_spin.setValue(getattr(config, "gpu_layers", 0))
         self._select_model_path(config.local_model_path)
         self._refresh_model_info()
 
@@ -122,12 +125,19 @@ class AISettingsDialog(QDialog):
         self.threads_spin.setValue(4)
         self.threads_spin.setAccessibleName("CPU threads count")
 
+        self.gpu_layers_spin.setRange(0, 200)
+        self.gpu_layers_spin.setSingleStep(1)
+        self.gpu_layers_spin.setValue(0)
+        self.gpu_layers_spin.setAccessibleName("GPU offload layers")
+
         token_layout.addWidget(QLabel("Context Size (n_ctx)"))
         token_layout.addWidget(self.context_size_spin, 1)
         token_layout.addWidget(QLabel("Max Tokens (max_tokens)"))
         token_layout.addWidget(self.max_tokens_spin, 1)
         token_layout.addWidget(QLabel("Threads (luồng)"))
         token_layout.addWidget(self.threads_spin, 1)
+        token_layout.addWidget(QLabel("GPU Layers"))
+        token_layout.addWidget(self.gpu_layers_spin, 1)
 
         layout.addWidget(token_panel)
 

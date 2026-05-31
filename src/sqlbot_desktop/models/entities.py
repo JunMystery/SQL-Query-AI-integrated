@@ -49,6 +49,10 @@ class ColumnInfo:
     name: str
     type_name: str = ""
     nullable: bool | None = None
+    is_primary: bool = False
+    is_foreign: bool = False
+    sample_value: str = ""
+    enum_values: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,7 @@ class TableInfo:
 
     name: str
     columns: list[ColumnInfo] = field(default_factory=list)
+    foreign_keys: list[dict[str, str]] = field(default_factory=list)
 
 
 class AIBackend(str, Enum):
@@ -77,6 +82,8 @@ class AIModelConfig:
     context_size: int = 4096
     max_tokens: int = 512
     threads: int = 4
+    gpu_layers: int = 0
+
 
 
 @dataclass(frozen=True)

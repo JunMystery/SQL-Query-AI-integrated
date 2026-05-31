@@ -56,6 +56,10 @@ class DatabaseManager:
             engine = create_engine(
                 self._build_url(profile, username, password),
                 pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+                pool_recycle=1800,
+                pool_timeout=30,
                 future=True,
             )
             connection = engine.connect()

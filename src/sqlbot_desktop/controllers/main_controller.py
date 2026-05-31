@@ -392,9 +392,10 @@ class MainController:
             "2. Chỉ sử dụng đúng các bảng và cột thực tế được cung cấp trong phần SCHEMA dưới đây. Tuyệt đối không tự bịa ra tên bảng hoặc tên cột không tồn tại.\n"
             "3. Lọc họ tên chính xác (ví dụ: lọc người dùng tên 'Tú' -> full_name = 'Tú' hoặc username = 'Tú' trên đúng bảng và cột tương ứng).\n"
             f"4. Khi lọc theo ngày tháng, bắt buộc phải sử dụng định dạng chuẩn ISO-8601 YYYY-MM-DD (ví dụ: '2026-05-01' và '2026-05-10') trên đúng cột thời gian của bảng đó.\n"
-            "5. Tuyệt đối không trả về bất kỳ mã nguồn lập trình nào khác (như Python, Java, v.v.).\n"
-            "6. Trả về câu lệnh SQL đặt trong cặp dấu nháy ```sql ... ```.\n"
-            "7. Giải thích cực kỳ ngắn gọn (dưới 3 câu) về hoạt động của câu lệnh SQL vừa tạo bằng tiếng Việt, không mô tả các bước suy luận trung gian."
+            "5. TUYỆT ĐỐI không tự ý nối (JOIN) các bảng bừa bãi dựa trên suy đoán. Chỉ thực hiện JOIN giữa các bảng nếu có quan hệ khóa ngoại (Foreign Keys) được định nghĩa rõ ràng trong phần '-- CÁC LIÊN KẾT LIÊN BẢNG HỢP LỆ' của SCHEMA dưới đây.\n"
+            "6. Tuyệt đối không trả về bất kỳ mã nguồn lập trình nào khác (như Python, Java, v.v.).\n"
+            "7. Trả về câu lệnh SQL đặt trong cặp dấu nháy ```sql ... ```.\n"
+            "8. Giải thích cực kỳ ngắn gọn (dưới 3 câu) về hoạt động của câu lệnh SQL vừa tạo bằng tiếng Việt, không mô tả các bước suy luận trung gian."
         )
 
         messages = [
@@ -714,20 +715,11 @@ class MainController:
 
 
         self._start_task(
-
-
             "Loading AI...",
-
-
             "Đang load model GGUF local." if config.backend.value == "local" else "Đang kiểm tra cấu hình API AI.",
-
-
             lambda: self.ai_engine.load(config, check_cancelled=self._is_task_cancelled),
-
-
             self._handle_load_result,
-
-
+            on_failed=lambda err: self.view.set_model_status(f"Load model thất bại: {err}", False)
         )
 
 

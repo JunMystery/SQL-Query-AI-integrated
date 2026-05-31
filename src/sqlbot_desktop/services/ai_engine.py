@@ -43,8 +43,10 @@ class AIEngine:
         return self._load_api(config)
 
     def unload(self) -> None:
+        import gc
         self.model = None
         self.config = None
+        gc.collect()
 
     def generate(
         self,
@@ -154,11 +156,20 @@ class AIEngine:
         try:
             from llama_cpp import Llama
 
+            # Auto-detect optimal threads count (Physical cores - 1, min 1)
+            optimal_threads = config.threads
+            if not optimal_threads:
+                import os
+                cpu_cores = os.cpu_count()
+                optimal_threads = max(1, (cpu_cores or 4) - 1)
+
             # Initialize llama model directly in the Python process
             self.model = Llama(
                 model_path=str(model_path),
                 n_ctx=config.context_size or 4096,
-                n_threads=config.threads or 4,
+                n_threads=optimal_threads,
+                n_gpu_layers=getattr(config, "gpu_layers", 0),
+                n_batch=512,  # Optimized batch size to prevent high DRAM consumption
                 verbose=False,
             )
             self.config = config
