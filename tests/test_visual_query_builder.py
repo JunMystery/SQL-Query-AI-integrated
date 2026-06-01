@@ -119,6 +119,42 @@ class VisualQueryBuilderTests(unittest.TestCase):
         self.assertFalse(panel.column_groups["orders"].isHidden())
         self.assertFalse(panel.column_groups["orders"].body.isHidden())
 
+    def test_table_select_all_checkbox_toggles_all_columns_in_group(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT"), ColumnInfo("name", "VARCHAR")]),
+            TableInfo("orders", [ColumnInfo("id", "INT"), ColumnInfo("amount", "DECIMAL")]),
+        ]
+        panel.set_schema(tables, {})
+
+        users_group = panel.column_groups["users"]
+        orders_group = panel.column_groups["orders"]
+
+        users_group.select_all_cb.setChecked(True)
+
+        self.assertTrue(all(row.isChecked() for row in users_group.iter_column_rows()))
+        self.assertEqual(panel.sort_list.count(), 2)
+        self.assertIn("SELECT u.id, u.name", panel.sql_editor.toPlainText())
+        self.assertEqual(users_group.select_all_cb.checkState(), Qt.CheckState.Checked)
+
+        users_group.iter_column_rows()[0].cb.setChecked(False)
+
+        self.assertEqual(users_group.select_all_cb.checkState(), Qt.CheckState.PartiallyChecked)
+
+        users_group.select_all_cb.setChecked(False)
+
+        self.assertFalse(any(row.isChecked() for row in users_group.iter_column_rows()))
+        self.assertEqual(panel.sort_list.count(), 0)
+        self.assertEqual(users_group.select_all_cb.checkState(), Qt.CheckState.Unchecked)
+
+        orders_group.select_all_cb.setChecked(True)
+
+        self.assertTrue(all(row.isChecked() for row in orders_group.iter_column_rows()))
+        self.assertEqual(
+            [panel.sort_list.item(i).data(Qt.UserRole) for i in range(panel.sort_list.count())],
+            ["orders.id", "orders.amount"],
+        )
+
     def test_join_safety_blocks_danger_candidate_column(self) -> None:
         panel = VisualQueryBuilderPanel()
         tables = [

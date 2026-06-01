@@ -303,28 +303,49 @@ class ColumnCheckBoxRow(QWidget):
 class ColumnTableGroupWidget(QWidget):
     """Collapsible table section used by the visual column picker."""
 
-    def __init__(self, table_name: str, title: str, expanded: bool, parent=None) -> None:
+    def __init__(
+        self,
+        table_name: str,
+        title: str,
+        expanded: bool,
+        selection_callback: Callable[[str, bool], None] | None = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.table_name = table_name
         self._title = title
         self._search_forced = False
+        self._selection_callback = selection_callback
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
+
+        header_row = QWidget()
+        header_layout = QHBoxLayout(header_row)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(4)
+
+        self.select_all_cb = QCheckBox()
+        self.select_all_cb.setObjectName("vqbTableSelectAllCheckBox")
+        self.select_all_cb.setTristate(False)
+        self.select_all_cb.setToolTip(tr("query_builder.select_all_table_columns", "Chọn / bỏ chọn tất cả cột trong bảng"))
+        self.select_all_cb.stateChanged.connect(self._on_select_all_changed)
 
         self.header_btn = QPushButton()
         self.header_btn.setCheckable(True)
         self.header_btn.setChecked(expanded)
         self.header_btn.setObjectName("vqbTableGroupHeader")
         self.header_btn.clicked.connect(lambda *_: self._sync_body_visibility())
+        header_layout.addWidget(self.select_all_cb)
+        header_layout.addWidget(self.header_btn, 1)
 
         self.body = QWidget()
         self.body_layout = QVBoxLayout(self.body)
         self.body_layout.setContentsMargins(10, 2, 0, 2)
         self.body_layout.setSpacing(2)
 
-        layout.addWidget(self.header_btn)
+        layout.addWidget(header_row)
         layout.addWidget(self.body)
         self._sync_body_visibility()
         self.update_header()
@@ -351,10 +372,27 @@ class ColumnTableGroupWidget(QWidget):
         marker = "v" if self.header_btn.isChecked() or self._search_forced else ">"
         suffix = f" ({selected}/{total})" if total else ""
         self.header_btn.setText(f"{marker} {self._title}{suffix}")
+        self._sync_select_all_state(selected, total)
 
     def _sync_body_visibility(self) -> None:
         self.body.setVisible(self.header_btn.isChecked() or self._search_forced)
         self.update_header()
+
+    def _sync_select_all_state(self, selected: int, total: int) -> None:
+        self.select_all_cb.blockSignals(True)
+        if total == 0 or selected == 0:
+            self.select_all_cb.setCheckState(Qt.CheckState.Unchecked)
+        elif selected == total:
+            self.select_all_cb.setCheckState(Qt.CheckState.Checked)
+        else:
+            self.select_all_cb.setCheckState(Qt.CheckState.PartiallyChecked)
+        self.select_all_cb.blockSignals(False)
+
+    def _on_select_all_changed(self, state: int) -> None:
+        if state == Qt.CheckState.PartiallyChecked.value:
+            return
+        if self._selection_callback:
+            self._selection_callback(self.table_name, state == Qt.CheckState.Checked.value)
 
 
 class ConditionRow(QWidget):
@@ -1128,7 +1166,13 @@ class VisualQueryBuilderPanel(QWidget):
 
         # 1. Main Table Columns
         main_title = tr("query_builder.main_table_prefix", "Bảng chính:") + f" {self._get_table_display_name(table_name)}"
-        main_group = ColumnTableGroupWidget(table_name, main_title, expanded=True, parent=self)
+        main_group = ColumnTableGroupWidget(
+            table_name,
+            main_title,
+            expanded=True,
+            selection_callback=self._set_table_columns_checked,
+            parent=self,
+        )
         self.column_groups[table_name] = main_group
         cols = self._get_active_columns()
         for c in cols:
@@ -1144,7 +1188,13 @@ class VisualQueryBuilderPanel(QWidget):
                 continue
 
             tbl_title = tr("query_builder.joined_table_prefix", "Bảng liên kết:") + f" {self._get_table_display_name(t.name)}"
-            table_group = ColumnTableGroupWidget(t.name, tbl_title, expanded=False, parent=self)
+            table_group = ColumnTableGroupWidget(
+                t.name,
+                tbl_title,
+                expanded=False,
+                selection_callback=self._set_table_columns_checked,
+                parent=self,
+            )
             self.column_groups[t.name] = table_group
 
             for c in t.columns:
@@ -1534,6 +1584,19 @@ class VisualQueryBuilderPanel(QWidget):
         group = self.column_groups.get(table_name)
         if group:
             group.update_header()
+        self._sync_group_order_columns()
+        self._update_query()
+
+    def _set_table_columns_checked(self, table_name: str, checked: bool) -> None:
+        group = self.column_groups.get(table_name)
+        if not group:
+            return
+
+        for row in group.iter_column_rows():
+            if not row.cb.isEnabled() or row.isChecked() == checked:
+                continue
+            row.cb.setChecked(checked)
+        group.update_header()
         self._sync_group_order_columns()
         self._update_query()
 
