@@ -51,6 +51,7 @@ from PySide6.QtCore import QUrl
 
 
 from sqlbot_desktop.services.cpu_limiter import CpuLimiter
+from sqlbot_desktop.services.join_safety_service import JoinSafetyResult, JoinSafetyService
 from sqlbot_desktop.services.prompt_builder import PromptBuilder
 
 
@@ -262,6 +263,7 @@ class MainController:
         self.ai_settings_repository = AISettingsRepository()
         self.ai_engine = AIEngine()
         self.text_to_sql_pipeline = TextToSqlPipeline(self.ai_engine, query_logger=QueryLogger())
+        self.join_safety_service = JoinSafetyService()
 
 
         self.view = MainWindow()
@@ -308,6 +310,7 @@ class MainController:
         self.view.visual_builder.execute_requested.connect(self.execute_query)
         self.view.visual_builder.show_results_requested.connect(self.view.show_results_dialog)
         self.view.visual_builder.bookmark_requested.connect(self.add_bookmark)
+        self.view.visual_builder.status_message_requested.connect(self.view.statusBar().showMessage)
 
 
         self.view.refresh_samples_requested.connect(self.refresh_sample_values)
@@ -364,8 +367,36 @@ class MainController:
         annotations = self.annotation_repository.load(self.profile.name)
 
         self.view.set_schema(tables, annotations, dialect=self.profile.driver)
+        self.view.visual_builder.set_join_safety_checker(self._check_visual_join_safety)
 
         self.schema_context = PromptBuilder.build_schema_context(tables, annotations)
+
+    def _check_visual_join_safety(self, selected_tables: list[str], candidate_table: str) -> JoinSafetyResult:
+        start_table = self.view.visual_builder.table_combo.currentData()
+        if not start_table:
+            return JoinSafetyResult(
+                True,
+                "warning",
+                tr("main.msg_join_safety_missing_table", "Chưa có bảng chính để kiểm tra JOIN."),
+                [],
+                sample_limit=self.join_safety_service.sample_limit,
+            )
+
+        connection = None
+        if self.database_manager is not None and self.connection_name:
+            try:
+                connection = self.database_manager.database(self.connection_name)
+            except Exception:
+                connection = None
+
+        return self.join_safety_service.check_candidate(
+            start_table=start_table,
+            selected_tables=selected_tables,
+            candidate_table=candidate_table,
+            tables=self.tables,
+            connection=connection,
+            dialect=self.profile.driver,
+        )
 
     def show_schema(self) -> None:
 

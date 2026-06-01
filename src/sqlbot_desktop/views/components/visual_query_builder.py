@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from sqlbot_desktop.utils.i18n_manager import tr
@@ -27,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from sqlbot_desktop.models.entities import TableInfo, ColumnInfo
+from sqlbot_desktop.services.join_safety_service import JoinSafetyResult
 
 
 def add_widget_to_packed_layout(layout: QVBoxLayout, widget: QWidget) -> None:
@@ -277,6 +280,70 @@ class ColumnCheckBoxRow(QWidget):
 
     def setChecked(self, checked: bool) -> None:
         self.cb.setChecked(checked)
+
+    def set_join_safety_state(self, enabled: bool, tooltip: str = "") -> None:
+        self.cb.setEnabled(enabled)
+        self.label.setEnabled(enabled)
+        self.cb.setToolTip(tooltip)
+        self.label.setToolTip(tooltip)
+        self.setToolTip(tooltip)
+
+
+class ColumnTableGroupWidget(QWidget):
+    """Collapsible table section used by the visual column picker."""
+
+    def __init__(self, table_name: str, title: str, expanded: bool, parent=None) -> None:
+        super().__init__(parent)
+        self.table_name = table_name
+        self._title = title
+        self._search_forced = False
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        self.header_btn = QPushButton()
+        self.header_btn.setCheckable(True)
+        self.header_btn.setChecked(expanded)
+        self.header_btn.setObjectName("vqbTableGroupHeader")
+        self.header_btn.clicked.connect(lambda *_: self._sync_body_visibility())
+
+        self.body = QWidget()
+        self.body_layout = QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(10, 2, 0, 2)
+        self.body_layout.setSpacing(2)
+
+        layout.addWidget(self.header_btn)
+        layout.addWidget(self.body)
+        self._sync_body_visibility()
+        self.update_header()
+
+    def add_column_row(self, row: ColumnCheckBoxRow) -> None:
+        self.body_layout.addWidget(row)
+        self.update_header()
+
+    def iter_column_rows(self) -> list[ColumnCheckBoxRow]:
+        rows: list[ColumnCheckBoxRow] = []
+        for i in range(self.body_layout.count()):
+            widget = self.body_layout.itemAt(i).widget()
+            if isinstance(widget, ColumnCheckBoxRow):
+                rows.append(widget)
+        return rows
+
+    def set_search_forced(self, forced: bool) -> None:
+        self._search_forced = forced
+        self._sync_body_visibility()
+
+    def update_header(self) -> None:
+        total = len(self.iter_column_rows())
+        selected = sum(1 for row in self.iter_column_rows() if row.isChecked())
+        marker = "v" if self.header_btn.isChecked() or self._search_forced else ">"
+        suffix = f" ({selected}/{total})" if total else ""
+        self.header_btn.setText(f"{marker} {self._title}{suffix}")
+
+    def _sync_body_visibility(self) -> None:
+        self.body.setVisible(self.header_btn.isChecked() or self._search_forced)
+        self.update_header()
 
 
 class ConditionRow(QWidget):
@@ -654,12 +721,15 @@ class VisualQueryBuilderPanel(QWidget):
     execute_requested = Signal()
     show_results_requested = Signal()
     bookmark_requested = Signal()
+    status_message_requested = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._tables: list[TableInfo] = []
         self._annotations: dict[str, object] = {}
         self._dialect = "sqlite"
+        self.column_groups: dict[str, ColumnTableGroupWidget] = {}
+        self._join_safety_checker: Callable[[list[str], str], JoinSafetyResult] | None = None
 
         self._build_ui()
         self.retranslate_ui()
@@ -961,6 +1031,10 @@ class VisualQueryBuilderPanel(QWidget):
 
         self._on_table_changed()
 
+    def set_join_safety_checker(self, checker: Callable[[list[str], str], JoinSafetyResult] | None) -> None:
+        self._join_safety_checker = checker
+        self._refresh_join_safety_states()
+
     def _get_table_display_name(self, table_name: str) -> str:
         tables_ann = self._annotations.get("tables", {})
         ann = tables_ann.get(table_name, {})
@@ -994,6 +1068,7 @@ class VisualQueryBuilderPanel(QWidget):
 
         # Clear columns list
         clear_packed_layout(self.columns_container_layout)
+        self.column_groups.clear()
 
         # Clear conditions
         clear_packed_layout(self.cond_container_layout)
@@ -1010,32 +1085,34 @@ class VisualQueryBuilderPanel(QWidget):
             return
 
         # 1. Main Table Columns
-        main_title = QLabel(tr("query_builder.main_table_prefix", "Bảng chính:") + f" {self._get_table_display_name(table_name)}")
-        main_title.setObjectName("vqbMainTableTitle")
-        add_widget_to_packed_layout(self.columns_container_layout, main_title)
-
+        main_title = tr("query_builder.main_table_prefix", "Bảng chính:") + f" {self._get_table_display_name(table_name)}"
+        main_group = ColumnTableGroupWidget(table_name, main_title, expanded=True, parent=self)
+        self.column_groups[table_name] = main_group
         cols = self._get_active_columns()
         for c in cols:
             disp = self._get_column_display_name(table_name, c.name)
             row_widget = ColumnCheckBoxRow(c.name, disp, c.type_name, self._on_column_checkbox_toggled, self)
             row_widget.cb.setProperty("table_name", table_name)
-            add_widget_to_packed_layout(self.columns_container_layout, row_widget)
+            main_group.add_column_row(row_widget)
+        add_widget_to_packed_layout(self.columns_container_layout, main_group)
 
         # 2. Joined Table Columns
         for t in self._tables:
             if t.name == table_name:
                 continue
 
-            tbl_label = QLabel(tr("query_builder.joined_table_prefix", "Bảng liên kết:") + f" {self._get_table_display_name(t.name)}")
-            tbl_label.setObjectName("vqbJoinTableTitle")
-            add_widget_to_packed_layout(self.columns_container_layout, tbl_label)
+            tbl_title = tr("query_builder.joined_table_prefix", "Bảng liên kết:") + f" {self._get_table_display_name(t.name)}"
+            table_group = ColumnTableGroupWidget(t.name, tbl_title, expanded=False, parent=self)
+            self.column_groups[t.name] = table_group
 
             for c in t.columns:
                 disp = self._get_column_display_name(t.name, c.name)
                 row_widget = ColumnCheckBoxRow(c.name, disp, c.type_name, self._on_column_checkbox_toggled, self)
                 row_widget.cb.setProperty("table_name", t.name)
-                add_widget_to_packed_layout(self.columns_container_layout, row_widget)
+                table_group.add_column_row(row_widget)
+            add_widget_to_packed_layout(self.columns_container_layout, table_group)
 
+        self._refresh_join_safety_states()
         self._update_query()
 
     def _get_active_columns(self) -> list[ColumnInfo]:
@@ -1275,6 +1352,57 @@ class VisualQueryBuilderPanel(QWidget):
         self.sort_list.setParent(self)
         self._update_query()
 
+    def _selected_join_tables(self) -> list[str]:
+        start_table = self.table_combo.currentData()
+        tables: set[str] = set()
+        for i in range(self.sort_list.count()):
+            full_name = self.sort_list.item(i).data(Qt.UserRole)
+            if isinstance(full_name, str) and "." in full_name:
+                table_name, _ = full_name.split(".", 1)
+                if table_name != start_table:
+                    tables.add(table_name)
+        return sorted(tables)
+
+    def _check_join_safety_for_table(self, table_name: str) -> JoinSafetyResult | None:
+        start_table = self.table_combo.currentData()
+        if not self._join_safety_checker or not table_name or table_name == start_table:
+            return None
+        selected_tables = [table for table in self._selected_join_tables() if table != table_name]
+        return self._join_safety_checker(selected_tables, table_name)
+
+    def _apply_join_safety_to_group(self, table_name: str, result: JoinSafetyResult | None) -> None:
+        group = self.column_groups.get(table_name)
+        if not group:
+            return
+
+        disable = bool(result and result.severity == "danger" and not result.ok)
+        tooltip = result.message if result else ""
+        for row in group.iter_column_rows():
+            if disable and row.isChecked():
+                row.cb.blockSignals(True)
+                row.setChecked(False)
+                row.cb.blockSignals(False)
+                self._remove_sort_item_for_row(row)
+            row.set_join_safety_state(not disable, tooltip)
+        group.update_header()
+
+    def _remove_sort_item_for_row(self, row: ColumnCheckBoxRow) -> None:
+        table_name = row.cb.property("table_name")
+        col_name = row.cb.property("col_name")
+        start_table = self.table_combo.currentData()
+        full_name = f"{table_name}.{col_name}" if table_name != start_table else col_name
+        for i in range(self.sort_list.count()):
+            if self.sort_list.item(i).data(Qt.UserRole) == full_name:
+                self.sort_list.takeItem(i)
+                break
+
+    def _refresh_join_safety_states(self) -> None:
+        start_table = self.table_combo.currentData()
+        for table_name, group in self.column_groups.items():
+            for row in group.iter_column_rows():
+                row.set_join_safety_state(True, "" if table_name == start_table else row.toolTip())
+            group.update_header()
+
     def _on_column_checkbox_toggled(self, state: int) -> None:
         sender_cb = self.sender()
         if not isinstance(sender_cb, QCheckBox):
@@ -1290,6 +1418,20 @@ class VisualQueryBuilderPanel(QWidget):
 
         is_checked = sender_cb.isChecked()
         if is_checked:
+            result = self._check_join_safety_for_table(table_name)
+            if result and result.severity == "danger" and not result.ok:
+                sender_cb.blockSignals(True)
+                sender_cb.setChecked(False)
+                sender_cb.blockSignals(False)
+                self._apply_join_safety_to_group(table_name, result)
+                self.status_message_requested.emit(result.message)
+                return
+            if result and result.severity == "warning":
+                row_widget = sender_cb.parentWidget()
+                if isinstance(row_widget, ColumnCheckBoxRow):
+                    row_widget.set_join_safety_state(True, result.message)
+                self.status_message_requested.emit(result.message)
+
             exists = False
             for i in range(self.sort_list.count()):
                 if self.sort_list.item(i).data(Qt.UserRole) == full_name:
@@ -1312,27 +1454,18 @@ class VisualQueryBuilderPanel(QWidget):
                     self.sort_list.takeItem(i)
                     break
 
+        group = self.column_groups.get(table_name)
+        if group:
+            group.update_header()
         self._update_query()
 
     def _filter_columns_list(self) -> None:
         filter_text = self.col_search_input.text().lower().strip() if hasattr(self, "col_search_input") else ""
         show_selected_only = self.show_selected_only_btn.isChecked() if hasattr(self, "show_selected_only_btn") else False
 
-        current_header = None
-        has_visible_cols_for_header = False
-        headers_to_check = []
-
-        for i in range(self.columns_container_layout.count()):
-            widget = self.columns_container_layout.itemAt(i).widget()
-            if not widget:
-                continue
-
-            if isinstance(widget, QLabel):
-                if current_header:
-                    headers_to_check.append((current_header, has_visible_cols_for_header))
-                current_header = widget
-                has_visible_cols_for_header = False
-            elif isinstance(widget, ColumnCheckBoxRow):
+        for group in self.column_groups.values():
+            has_visible_rows = False
+            for widget in group.iter_column_rows():
                 col_name = widget.cb.property("col_name") or ""
                 tbl_name = widget.cb.property("table_name") or ""
                 disp_text = widget.label.text().lower()
@@ -1350,22 +1483,18 @@ class VisualQueryBuilderPanel(QWidget):
 
                 widget.setVisible(match)
                 if match:
-                    has_visible_cols_for_header = True
+                    has_visible_rows = True
 
-        if current_header:
-            headers_to_check.append((current_header, has_visible_cols_for_header))
-
-        for header, has_visible_cols in headers_to_check:
-            if not filter_text and not show_selected_only:
-                header.setVisible(True)
-            else:
-                header.setVisible(has_visible_cols)
+            filtering = bool(filter_text or show_selected_only)
+            group.setVisible(True if not filtering else has_visible_rows)
+            group.set_search_forced(bool(filter_text and has_visible_rows))
+            group.update_header()
 
     def _clear_all_selected_columns(self) -> None:
         has_selected = any(
-            isinstance(self.columns_container_layout.itemAt(i).widget(), ColumnCheckBoxRow)
-            and self.columns_container_layout.itemAt(i).widget().isChecked()
-            for i in range(self.columns_container_layout.count())
+            row.isChecked()
+            for group in self.column_groups.values()
+            for row in group.iter_column_rows()
         )
         if not has_selected:
             return
@@ -1380,10 +1509,12 @@ class VisualQueryBuilderPanel(QWidget):
         if answer != QMessageBox.StandardButton.Yes:
             return
 
-        for i in range(self.columns_container_layout.count()):
-            widget = self.columns_container_layout.itemAt(i).widget()
-            if isinstance(widget, ColumnCheckBoxRow) and widget.isChecked():
-                widget.cb.setChecked(False)
+        for group in self.column_groups.values():
+            for row in group.iter_column_rows():
+                if row.isChecked():
+                    row.cb.setChecked(False)
+            group.update_header()
+        self._refresh_join_safety_states()
 
     def _show_column_context_menu(self, pos) -> None:
         item = self.sort_list.itemAt(pos)

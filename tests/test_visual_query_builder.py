@@ -17,6 +17,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from sqlbot_desktop.models.entities import ColumnInfo, TableInfo
+from sqlbot_desktop.services.join_safety_service import JoinSafetyResult
 from sqlbot_desktop.views.components.visual_query_builder import ConditionRow, VisualQueryBuilderPanel
 
 
@@ -100,6 +101,77 @@ class VisualQueryBuilderTests(unittest.TestCase):
         # Combo should display description for users, but fallback to orders name
         self.assertEqual(panel.table_combo.itemText(0), "Người dùng (users)")
         self.assertEqual(panel.table_combo.itemText(1), "orders")
+
+    def test_column_picker_groups_collapse_and_search_expands_matches(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT"), ColumnInfo("name", "VARCHAR")]),
+            TableInfo("orders", [ColumnInfo("id", "INT"), ColumnInfo("amount", "DECIMAL")]),
+        ]
+        panel.set_schema(tables, {})
+
+        self.assertFalse(panel.column_groups["users"].body.isHidden())
+        self.assertTrue(panel.column_groups["orders"].body.isHidden())
+
+        panel.col_search_input.setText("amount")
+
+        self.assertFalse(panel.column_groups["orders"].isHidden())
+        self.assertFalse(panel.column_groups["orders"].body.isHidden())
+
+    def test_join_safety_blocks_danger_candidate_column(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT")]),
+            TableInfo("orders", [ColumnInfo("amount", "DECIMAL")]),
+        ]
+        panel.set_schema(tables, {})
+        panel.set_join_safety_checker(
+            lambda selected, candidate: JoinSafetyResult(
+                False,
+                "danger",
+                "Không tìm thấy JOIN path theo schema/FK.",
+                [],
+            )
+        )
+
+        amount_row = next(
+            row
+            for row in panel.column_groups["orders"].iter_column_rows()
+            if row.cb.property("col_name") == "amount"
+        )
+        amount_row.cb.setChecked(True)
+
+        self.assertFalse(amount_row.cb.isChecked())
+        self.assertFalse(amount_row.cb.isEnabled())
+        self.assertEqual(panel.sort_list.count(), 0)
+        self.assertIn("JOIN path", amount_row.toolTip())
+
+    def test_join_safety_keeps_valid_candidate_column(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT")]),
+            TableInfo("orders", [ColumnInfo("amount", "DECIMAL")]),
+        ]
+        panel.set_schema(tables, {})
+        panel.set_join_safety_checker(
+            lambda selected, candidate: JoinSafetyResult(
+                True,
+                "ok",
+                "JOIN path hợp lệ trong mẫu kiểm tra.",
+                [("users", "id", "orders", "user_id")],
+                matched_sample_rows=10,
+            )
+        )
+
+        amount_row = next(
+            row
+            for row in panel.column_groups["orders"].iter_column_rows()
+            if row.cb.property("col_name") == "amount"
+        )
+        amount_row.cb.setChecked(True)
+
+        self.assertTrue(amount_row.cb.isChecked())
+        self.assertEqual(panel.sort_list.count(), 1)
 
     def test_column_toolbar_uses_compact_order_and_confirmed_clear(self) -> None:
         panel = VisualQueryBuilderPanel()
