@@ -790,7 +790,7 @@ class SchemaAnnotationWidget(QWidget):
                 column_item.setToolTip(0, tr("settings.annotation_column_prefix", "Cột:") + f" {table.name}.{column.name}")
                 table_item.addChild(column_item)
 
-        self.tree.expandAll()
+        self.tree.collapseAll()
         for index in range(self.tree.columnCount()):
             self.tree.resizeColumnToContents(index)
         self.tree.blockSignals(False)
@@ -881,8 +881,7 @@ class SchemaAnnotationWidget(QWidget):
 
             if table_matches or any_column_matches:
                 table_item.setHidden(False)
-                if query:
-                    table_item.setExpanded(True)
+                table_item.setExpanded(bool(query))
             else:
                 table_item.setHidden(True)
 

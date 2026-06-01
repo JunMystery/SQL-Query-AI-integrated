@@ -157,6 +157,28 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(col_item.text(2), "đơn vị")
         self.assertEqual(col_item.text(3), "Chỉ dùng số nguyên")
 
+    def test_schema_annotation_tables_are_collapsed_by_default(self) -> None:
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT"), ColumnInfo("name", "VARCHAR")]),
+            TableInfo("orders", [ColumnInfo("amount", "DECIMAL")])
+        ]
+        dialog = SettingsDialog(
+            config=AIModelConfig(backend=AIBackend.LOCAL),
+            connection_name="test_conn",
+            tables=tables
+        )
+        schema_w = dialog.schema_widget
+
+        for table_index in range(schema_w.tree.topLevelItemCount()):
+            self.assertFalse(schema_w.tree.topLevelItem(table_index).isExpanded())
+
+        schema_w.search_input.setText("amount")
+        self.assertTrue(schema_w.tree.topLevelItem(1).isExpanded())
+
+        schema_w.search_input.clear()
+        for table_index in range(schema_w.tree.topLevelItemCount()):
+            self.assertFalse(schema_w.tree.topLevelItem(table_index).isExpanded())
+
     def test_schema_annotation_search_filter(self) -> None:
         tables = [
             TableInfo("users", [ColumnInfo("id", "INT"), ColumnInfo("name", "VARCHAR")]),
