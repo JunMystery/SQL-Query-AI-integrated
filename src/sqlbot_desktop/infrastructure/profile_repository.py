@@ -36,6 +36,8 @@ class ProfileRepository:
                     username=str(item.get("username", "")),
                     description=str(item.get("description", "")),
                     extra=str(item.get("extra", "")),
+                    query_max_rows=self._clamp_int(item.get("query_max_rows"), 1000, 1, 1000),
+                    query_timeout_seconds=self._clamp_int(item.get("query_timeout_seconds"), 10, 1, 300),
                 )
             )
 
@@ -61,3 +63,10 @@ class ProfileRepository:
             "POSTGRESQL": "POSTGRESQL",
         }
         return aliases.get(driver, driver)
+
+    def _clamp_int(self, value: object, default: int, minimum: int, maximum: int) -> int:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            number = default
+        return max(minimum, min(number, maximum))

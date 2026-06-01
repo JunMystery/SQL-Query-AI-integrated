@@ -87,6 +87,20 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(dialog.stack.currentIndex(), 0)
         dialog.nav_list.setCurrentRow(1)
         self.assertEqual(dialog.stack.currentIndex(), 1)
+        self.assertEqual(dialog.nav_list.item(0).text(), "Cài đặt AI")
+        self.assertEqual(dialog.nav_list.item(1).text(), "Chú thích CSDL")
+        self.assertEqual(dialog.nav_list.count(), 2)
+
+    def test_settings_dialog_does_not_expose_it_settings(self) -> None:
+        dialog = SettingsDialog(
+            config=AIModelConfig(backend=AIBackend.LOCAL),
+            connection_name="test_conn",
+            tables=[]
+        )
+
+        nav_items = [dialog.nav_list.item(i).text() for i in range(dialog.nav_list.count())]
+        self.assertNotIn("Cài đặt IT", nav_items)
+        self.assertFalse(hasattr(dialog, "it_widget"))
 
     def test_schema_annotation_dirty_state(self) -> None:
         tables = [

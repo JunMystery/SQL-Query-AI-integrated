@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIntValidator, QValidator
 from sqlbot_desktop.utils.i18n_manager import tr
 from PySide6.QtWidgets import (
     QWidget,
@@ -238,6 +238,17 @@ class StyledComboBox(QComboBox):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("vqbCombo")
+
+
+class StrictIntRangeValidator(QIntValidator):
+    """Integer range validator that rejects values above the upper bound."""
+
+    def validate(self, input_text: str, pos: int):
+        state, value, position = super().validate(input_text, pos)
+        if state == QValidator.State.Intermediate and input_text.strip().isdigit():
+            if int(input_text.strip()) > self.top():
+                return QValidator.State.Invalid, value, position
+        return state, value, position
 
 
 class ColumnCheckBoxRow(QWidget):
@@ -604,9 +615,8 @@ class OrderByRow(QWidget):
             return col_name
 
         self.col_combo = SearchableComboBox()
-        for col in columns:
-            disp = get_col_disp_name(col.name)
-            self.col_combo.addItem(disp, col.name)
+        self._get_col_disp_name = get_col_disp_name
+        self.set_columns(columns)
         self.col_combo.currentIndexChanged.connect(self._on_changed)
 
         self.dir_combo = StyledComboBox()
@@ -635,6 +645,21 @@ class OrderByRow(QWidget):
 
     def _on_changed(self, *args) -> None:
         self.changed.emit()
+
+    def set_columns(self, columns: list[ColumnInfo]) -> None:
+        current_col = self.col_combo.currentData() if hasattr(self, "col_combo") else None
+        self.columns = columns
+        self.col_combo.blockSignals(True)
+        self.col_combo.clear()
+        selected_index = 0
+        for index, col in enumerate(columns):
+            disp = self._get_col_disp_name(col.name)
+            self.col_combo.addItem(disp, col.name)
+            if col.name == current_col:
+                selected_index = index
+        if columns:
+            self.col_combo.setCurrentIndex(selected_index)
+        self.col_combo.blockSignals(False)
 
     def get_sql_part(self) -> str:
         col_name = self.col_combo.currentData()
@@ -684,9 +709,8 @@ class GroupByRow(QWidget):
             return col_name
 
         self.col_combo = SearchableComboBox()
-        for col in columns:
-            disp = get_col_disp_name(col.name)
-            self.col_combo.addItem(disp, col.name)
+        self._get_col_disp_name = get_col_disp_name
+        self.set_columns(columns)
         self.col_combo.currentIndexChanged.connect(self._on_changed)
 
         self.del_btn = QPushButton()
@@ -704,6 +728,21 @@ class GroupByRow(QWidget):
 
     def _on_changed(self, *args) -> None:
         self.changed.emit()
+
+    def set_columns(self, columns: list[ColumnInfo]) -> None:
+        current_col = self.col_combo.currentData() if hasattr(self, "col_combo") else None
+        self.columns = columns
+        self.col_combo.blockSignals(True)
+        self.col_combo.clear()
+        selected_index = 0
+        for index, col in enumerate(columns):
+            disp = self._get_col_disp_name(col.name)
+            self.col_combo.addItem(disp, col.name)
+            if col.name == current_col:
+                selected_index = index
+        if columns:
+            self.col_combo.setCurrentIndex(selected_index)
+        self.col_combo.blockSignals(False)
 
     def get_sql_part(self) -> str:
         col_name = self.col_combo.currentData()
@@ -795,6 +834,7 @@ class VisualQueryBuilderPanel(QWidget):
         self.columns_scroll.setWidgetResizable(True)
         self.columns_scroll.setObjectName("vqbScrollArea")
         self.columns_container = QWidget()
+        self.columns_container.setObjectName("vqbScrollContent")
         self.columns_container_layout = QVBoxLayout(self.columns_container)
         self.columns_container_layout.setContentsMargins(*self.COLUMNS_LAYOUT_MARGINS)
         self.columns_container_layout.setSpacing(self.COLUMNS_LAYOUT_SPACING)
@@ -823,9 +863,8 @@ class VisualQueryBuilderPanel(QWidget):
         self.limit_label.setObjectName("vqbLimitLabel")
         self.limit_label.setFixedWidth(80)
 
-        from PySide6.QtGui import QIntValidator
         self.limit_input = QLineEdit()
-        self.limit_input.setValidator(QIntValidator(1, 1000000, self))
+        self.limit_input.setValidator(StrictIntRangeValidator(1, 1000, self))
         self.limit_input.setObjectName("vqbLimitInput")
         self.limit_input.setFixedWidth(90)
         self.limit_input.textChanged.connect(lambda *args: self._update_query())
@@ -845,6 +884,7 @@ class VisualQueryBuilderPanel(QWidget):
         self.cond_scroll.setWidgetResizable(True)
         self.cond_scroll.setObjectName("vqbScrollArea")
         self.cond_container = QWidget()
+        self.cond_container.setObjectName("vqbScrollContent")
         self.cond_container_layout = QVBoxLayout(self.cond_container)
         self.cond_container_layout.setContentsMargins(2, 2, 2, 2)
         self.cond_container_layout.setSpacing(2)
@@ -878,6 +918,7 @@ class VisualQueryBuilderPanel(QWidget):
         self.groupby_scroll.setWidgetResizable(True)
         self.groupby_scroll.setObjectName("vqbScrollArea")
         self.groupby_container = QWidget()
+        self.groupby_container.setObjectName("vqbScrollContent")
         self.groupby_container_layout = QVBoxLayout(self.groupby_container)
         self.groupby_container_layout.setContentsMargins(2, 2, 2, 2)
         self.groupby_container_layout.setSpacing(2)
@@ -903,6 +944,7 @@ class VisualQueryBuilderPanel(QWidget):
         self.orderby_scroll.setWidgetResizable(True)
         self.orderby_scroll.setObjectName("vqbScrollArea")
         self.orderby_container = QWidget()
+        self.orderby_container.setObjectName("vqbScrollContent")
         self.orderby_container_layout = QVBoxLayout(self.orderby_container)
         self.orderby_container_layout.setContentsMargins(2, 2, 2, 2)
         self.orderby_container_layout.setSpacing(2)
@@ -1161,24 +1203,12 @@ class VisualQueryBuilderPanel(QWidget):
         self._update_query()
 
     def _add_groupby_row(self) -> None:
-        all_cols_info = []
-        for t in self._tables:
-            for c in t.columns:
-                prefixed_c = ColumnInfo(
-                    name=f"{t.name}.{c.name}",
-                    type_name=c.type_name,
-                    nullable=c.nullable,
-                    is_primary=c.is_primary,
-                    is_foreign=c.is_foreign,
-                    sample_value=c.sample_value,
-                    enum_values=c.enum_values
-                )
-                all_cols_info.append(prefixed_c)
+        selected_cols_info = self._selected_column_infos()
 
-        if not all_cols_info:
+        if not selected_cols_info:
             return
 
-        row = GroupByRow(all_cols_info, self._annotations, self)
+        row = GroupByRow(selected_cols_info, self._annotations, self)
         row.changed.connect(self._update_query)
         row.delete_requested.connect(self._delete_groupby_row)
         add_widget_to_packed_layout(self.groupby_container_layout, row)
@@ -1191,24 +1221,12 @@ class VisualQueryBuilderPanel(QWidget):
         self._update_query()
 
     def _add_orderby_row(self) -> None:
-        all_cols_info = []
-        for t in self._tables:
-            for c in t.columns:
-                prefixed_c = ColumnInfo(
-                    name=f"{t.name}.{c.name}",
-                    type_name=c.type_name,
-                    nullable=c.nullable,
-                    is_primary=c.is_primary,
-                    is_foreign=c.is_foreign,
-                    sample_value=c.sample_value,
-                    enum_values=c.enum_values
-                )
-                all_cols_info.append(prefixed_c)
+        selected_cols_info = self._selected_column_infos()
 
-        if not all_cols_info:
+        if not selected_cols_info:
             return
 
-        row = OrderByRow(all_cols_info, self._annotations, self)
+        row = OrderByRow(selected_cols_info, self._annotations, self)
         row.changed.connect(self._update_query)
         row.delete_requested.connect(self._delete_orderby_row)
         add_widget_to_packed_layout(self.orderby_container_layout, row)
@@ -1219,6 +1237,65 @@ class VisualQueryBuilderPanel(QWidget):
         self.orderby_container_layout.removeWidget(row_widget)
         row_widget.setParent(None)
         self._update_query()
+
+    def _selected_column_infos(self) -> list[ColumnInfo]:
+        table_name = self.table_combo.currentData()
+        selected_columns: list[ColumnInfo] = []
+        for i in range(self.sort_list.count()):
+            full_name = self.sort_list.item(i).data(Qt.UserRole)
+            if not isinstance(full_name, str):
+                continue
+            source_table, col_name = self._split_selected_column(full_name, table_name)
+            column = self._find_column_info(source_table, col_name)
+            if column is None:
+                continue
+            selected_columns.append(
+                ColumnInfo(
+                    name=full_name,
+                    type_name=column.type_name,
+                    nullable=column.nullable,
+                    is_primary=column.is_primary,
+                    is_foreign=column.is_foreign,
+                    sample_value=column.sample_value,
+                    enum_values=column.enum_values,
+                )
+            )
+        return selected_columns
+
+    def _split_selected_column(self, full_name: str, start_table: str) -> tuple[str, str]:
+        if "." in full_name:
+            return full_name.split(".", 1)
+        return start_table, full_name
+
+    def _find_column_info(self, table_name: str, col_name: str) -> ColumnInfo | None:
+        for table in self._tables:
+            if table.name != table_name:
+                continue
+            for column in table.columns:
+                if column.name == col_name:
+                    return column
+        return None
+
+    def _sync_group_order_columns(self) -> None:
+        selected_cols = self._selected_column_infos()
+        valid_names = {col.name for col in selected_cols}
+
+        for layout, row_type in (
+            (self.groupby_container_layout, GroupByRow),
+            (self.orderby_container_layout, OrderByRow),
+        ):
+            rows_to_remove: list[QWidget] = []
+            for i in range(layout.count()):
+                widget = layout.itemAt(i).widget()
+                if isinstance(widget, row_type):
+                    current_col = widget.col_combo.currentData()
+                    if not selected_cols or current_col not in valid_names:
+                        rows_to_remove.append(widget)
+                    else:
+                        widget.set_columns(selected_cols)
+            for widget in rows_to_remove:
+                layout.removeWidget(widget)
+                widget.deleteLater()
 
     def _update_query(self) -> None:
         table_name = self.table_combo.currentData()
@@ -1302,7 +1379,7 @@ class VisualQueryBuilderPanel(QWidget):
         limit_val = None
         limit_text = self.limit_input.text().strip() if hasattr(self, "limit_input") else ""
         if limit_text.isdigit():
-            limit_val = int(limit_text)
+            limit_val = min(int(limit_text), 1000)
 
         # Build using Advanced Agents (Orchestrator, SchemaGraph, JoinPlanner)
         try:
@@ -1457,6 +1534,7 @@ class VisualQueryBuilderPanel(QWidget):
         group = self.column_groups.get(table_name)
         if group:
             group.update_header()
+        self._sync_group_order_columns()
         self._update_query()
 
     def _filter_columns_list(self) -> None:
@@ -1515,6 +1593,8 @@ class VisualQueryBuilderPanel(QWidget):
                     row.cb.setChecked(False)
             group.update_header()
         self._refresh_join_safety_states()
+        self._sync_group_order_columns()
+        self._update_query()
 
     def _show_column_context_menu(self, pos) -> None:
         item = self.sort_list.itemAt(pos)

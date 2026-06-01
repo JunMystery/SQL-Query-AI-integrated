@@ -16,6 +16,8 @@ from sqlbot_desktop.services.query_validator import QueryValidator
 
 
 SUPPORTED_DRIVERS = {"MYSQL", "POSTGRESQL"}
+MAX_QUERY_ROWS = 1000
+QUERY_TIMEOUT_SECONDS = 10
 
 
 @dataclass(frozen=True)
@@ -98,7 +100,8 @@ class DatabaseManager:
         self,
         sql: str,
         connection_name: str | None = None,
-        max_rows: int = 500,
+        max_rows: int = MAX_QUERY_ROWS,
+        timeout_seconds: int = QUERY_TIMEOUT_SECONDS,
     ) -> QueryExecutionResult:
         started = perf_counter()
         if not QueryValidator.is_readonly_select(sql):
@@ -110,9 +113,15 @@ class DatabaseManager:
             )
 
         try:
-            result = self.database(connection_name).execute(text(sql))
+            row_limit = self._clamp_max_rows(max_rows)
+            timeout = self._clamp_timeout_seconds(timeout_seconds)
+            connection = self.database(connection_name)
+            dialect = self._connection_dialect(connection)
+            self._apply_query_timeout(connection, dialect, timeout)
+            executable_sql = self._limited_select_sql(sql, row_limit, dialect, timeout)
+            result = connection.execute(text(executable_sql))
             columns = [str(column) for column in result.keys()]
-            rows = [list(row) for row in result.fetchmany(max_rows)]
+            rows = [list(row) for row in result.fetchmany(row_limit)]
         except KeyError as exc:
             return QueryExecutionResult(
                 False,
@@ -122,10 +131,11 @@ class DatabaseManager:
                 elapsed_ms=(perf_counter() - started) * 1000,
             )
         except SQLAlchemyError as exc:
+            error_type = "timeout" if self._is_timeout_error(exc) else "sql"
             return QueryExecutionResult(
                 False,
                 f"Không thể thực thi SQL: {exc}",
-                error_type="sql",
+                error_type=error_type,
                 sql=sql,
                 elapsed_ms=(perf_counter() - started) * 1000,
             )
@@ -147,6 +157,54 @@ class DatabaseManager:
             row_count=len(rows),
             elapsed_ms=elapsed_ms,
             sql=sql,
+        )
+
+    def _clamp_max_rows(self, max_rows: int) -> int:
+        try:
+            value = int(max_rows)
+        except (TypeError, ValueError):
+            value = MAX_QUERY_ROWS
+        return max(1, min(value, MAX_QUERY_ROWS))
+
+    def _clamp_timeout_seconds(self, timeout_seconds: int) -> int:
+        try:
+            value = int(timeout_seconds)
+        except (TypeError, ValueError):
+            value = QUERY_TIMEOUT_SECONDS
+        return max(1, min(value, 300))
+
+    def _limited_select_sql(self, sql: str, max_rows: int, dialect: str, timeout_seconds: int) -> str:
+        cleaned = sql.strip().rstrip(";").strip()
+        if dialect == "mysql":
+            timeout_ms = timeout_seconds * 1000
+            return (
+                f"SELECT /*+ MAX_EXECUTION_TIME({timeout_ms}) */ * "
+                f"FROM ({cleaned}) AS sqlbot_limited LIMIT {max_rows}"
+            )
+        return f"SELECT * FROM ({cleaned}) AS sqlbot_limited LIMIT {max_rows}"
+
+    def _apply_query_timeout(self, connection: Connection, dialect: str, timeout_seconds: int) -> None:
+        if dialect == "postgresql":
+            timeout_ms = timeout_seconds * 1000
+            connection.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
+
+    def _connection_dialect(self, connection: Connection) -> str:
+        dialect = getattr(getattr(connection, "engine", None), "dialect", None)
+        name = getattr(dialect, "name", "")
+        return str(name).lower()
+
+    def _is_timeout_error(self, exc: SQLAlchemyError) -> bool:
+        message = str(exc).lower()
+        return any(
+            marker in message
+            for marker in (
+                "timeout",
+                "timed out",
+                "statement timeout",
+                "max_execution_time",
+                "query execution was interrupted",
+                "canceling statement due to statement timeout",
+            )
         )
 
     def close_connection(self, connection_name: str) -> None:

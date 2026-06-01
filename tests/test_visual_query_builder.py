@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QValidator
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from sqlbot_desktop.models.entities import ColumnInfo, TableInfo
@@ -270,3 +271,193 @@ class VisualQueryBuilderTests(unittest.TestCase):
         panel._apply_column_function(item, None)
         self.assertEqual(item.text(), "id (INT)")
         self.assertIn("SELECT DISTINCT u.id", panel.sql_editor.toPlainText())
+
+    def test_related_table_column_selection_generates_join(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo(
+                "users",
+                [
+                    ColumnInfo("id", "INT", is_primary=True, nullable=False),
+                    ColumnInfo("name", "VARCHAR"),
+                ],
+            ),
+            TableInfo(
+                "orders",
+                [
+                    ColumnInfo("id", "INT", is_primary=True, nullable=False),
+                    ColumnInfo("user_id", "INT", is_foreign=True, nullable=True),
+                    ColumnInfo("amount", "DECIMAL"),
+                ],
+                foreign_keys=[
+                    {
+                        "constrained_table": "orders",
+                        "constrained_column": "user_id",
+                        "referred_table": "users",
+                        "referred_column": "id",
+                    }
+                ],
+            ),
+        ]
+        panel.set_schema(tables, {})
+
+        from PySide6.QtWidgets import QCheckBox
+        col_cbs = [
+            cb for cb in panel.findChildren(QCheckBox)
+            if cb.property("col_name") is not None
+        ]
+        amount_cb = next(
+            cb for cb in col_cbs
+            if cb.property("table_name") == "orders" and cb.property("col_name") == "amount"
+        )
+        amount_cb.setChecked(True)
+
+        sql = panel.sql_editor.toPlainText()
+        self.assertIn("SELECT o.amount", sql)
+        self.assertIn("FROM users u", sql)
+        self.assertIn("LEFT JOIN orders o ON u.id = o.user_id", sql)
+        self.assertNotEqual(sql.strip(), "SELECT orders.amount\nFROM users")
+
+    def test_related_table_order_by_generates_join(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo(
+                "users",
+                [
+                    ColumnInfo("id", "INT", is_primary=True, nullable=False),
+                    ColumnInfo("name", "VARCHAR"),
+                ],
+            ),
+            TableInfo(
+                "orders",
+                [
+                    ColumnInfo("id", "INT", is_primary=True, nullable=False),
+                    ColumnInfo("user_id", "INT", is_foreign=True, nullable=True),
+                    ColumnInfo("amount", "DECIMAL"),
+                ],
+                foreign_keys=[
+                    {
+                        "constrained_table": "orders",
+                        "constrained_column": "user_id",
+                        "referred_table": "users",
+                        "referred_column": "id",
+                    }
+                ],
+            ),
+        ]
+        panel.set_schema(tables, {})
+
+        from PySide6.QtWidgets import QCheckBox
+        amount_cb = next(
+            cb for cb in panel.findChildren(QCheckBox)
+            if cb.property("table_name") == "orders" and cb.property("col_name") == "amount"
+        )
+        amount_cb.setChecked(True)
+        panel._add_orderby_row()
+
+        order_row = panel.orderby_container_layout.itemAt(0).widget()
+        for index in range(order_row.col_combo.count()):
+            if order_row.col_combo.itemData(index) == "orders.amount":
+                order_row.col_combo.setCurrentIndex(index)
+                break
+
+        sql = panel.sql_editor.toPlainText()
+        self.assertIn("FROM users u", sql)
+        self.assertIn("LEFT JOIN orders o ON u.id = o.user_id", sql)
+        self.assertIn("ORDER BY o.amount ASC", sql)
+
+    def test_groupby_and_orderby_only_offer_selected_columns(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT"), ColumnInfo("name", "VARCHAR")]),
+            TableInfo(
+                "orders",
+                [
+                    ColumnInfo("id", "INT"),
+                    ColumnInfo("user_id", "INT"),
+                    ColumnInfo("amount", "DECIMAL"),
+                ],
+            ),
+        ]
+        panel.set_schema(tables, {})
+
+        from PySide6.QtWidgets import QCheckBox
+        col_cbs = [
+            cb for cb in panel.findChildren(QCheckBox)
+            if cb.property("col_name") is not None
+        ]
+        user_id_cb = next(
+            cb for cb in col_cbs
+            if cb.property("table_name") == "users" and cb.property("col_name") == "id"
+        )
+        amount_cb = next(
+            cb for cb in col_cbs
+            if cb.property("table_name") == "orders" and cb.property("col_name") == "amount"
+        )
+        user_id_cb.setChecked(True)
+        amount_cb.setChecked(True)
+
+        panel._add_groupby_row()
+        panel._add_orderby_row()
+        group_row = panel.groupby_container_layout.itemAt(0).widget()
+        order_row = panel.orderby_container_layout.itemAt(0).widget()
+
+        self.assertEqual(
+            [group_row.col_combo.itemData(i) for i in range(group_row.col_combo.count())],
+            ["id", "orders.amount"],
+        )
+        self.assertEqual(
+            [order_row.col_combo.itemData(i) for i in range(order_row.col_combo.count())],
+            ["id", "orders.amount"],
+        )
+
+        name_options = [
+            group_row.col_combo.itemData(i)
+            for i in range(group_row.col_combo.count())
+        ]
+        self.assertNotIn("name", name_options)
+        self.assertNotIn("orders.user_id", name_options)
+
+    def test_groupby_and_orderby_rows_removed_when_selected_column_is_unchecked(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        tables = [
+            TableInfo("users", [ColumnInfo("id", "INT"), ColumnInfo("name", "VARCHAR")]),
+        ]
+        panel.set_schema(tables, {})
+
+        from PySide6.QtWidgets import QCheckBox
+        id_cb = next(
+            cb for cb in panel.findChildren(QCheckBox)
+            if cb.property("table_name") == "users" and cb.property("col_name") == "id"
+        )
+        id_cb.setChecked(True)
+        panel._add_groupby_row()
+        panel._add_orderby_row()
+
+        def row_class_names(layout):
+            return [
+                layout.itemAt(i).widget().__class__.__name__
+                for i in range(layout.count())
+                if layout.itemAt(i).widget() is not None
+            ]
+
+        self.assertIn("GroupByRow", row_class_names(panel.groupby_container_layout))
+        self.assertIn("OrderByRow", row_class_names(panel.orderby_container_layout))
+
+        id_cb.setChecked(False)
+
+        self.assertNotIn("GroupByRow", row_class_names(panel.groupby_container_layout))
+        self.assertNotIn("OrderByRow", row_class_names(panel.orderby_container_layout))
+
+    def test_limit_input_allows_at_most_1000_rows(self) -> None:
+        panel = VisualQueryBuilderPanel()
+        validator = panel.limit_input.validator()
+
+        self.assertIsNotNone(validator)
+        self.assertEqual(validator.validate("1000", 4)[0], QValidator.State.Acceptable)
+        self.assertEqual(validator.validate("1001", 4)[0], QValidator.State.Invalid)
+
+        panel.set_schema([TableInfo("users", [ColumnInfo("id", "INT")])], {})
+        panel.limit_input.setText("25")
+
+        self.assertIn("LIMIT 25", panel.sql_editor.toPlainText())

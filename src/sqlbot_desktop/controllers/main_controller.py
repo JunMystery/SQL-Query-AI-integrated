@@ -422,7 +422,14 @@ class MainController:
                 dialect=self.profile.driver.upper(),
                 fallback_schema_context=self.schema_context,
                 execute_sql=(
-                    (lambda sql: self.database_manager.execute_select(sql, self.connection_name))
+                    (
+                        lambda sql: self.database_manager.execute_select(
+                            sql,
+                            self.connection_name,
+                            max_rows=self._query_max_rows(),
+                            timeout_seconds=self._query_timeout_seconds(),
+                        )
+                    )
                     if self.database_manager is not None and self.connection_name
                     else None
                 ),
@@ -551,7 +558,12 @@ class MainController:
 
             tr("main.status_executing_select", "Đang thực thi SELECT và tải Query Results."),
 
-            lambda: self.database_manager.execute_select(sql, self.connection_name),
+            lambda: self.database_manager.execute_select(
+                sql,
+                self.connection_name,
+                max_rows=self._query_max_rows(),
+                timeout_seconds=self._query_timeout_seconds(),
+            ),
 
             self._handle_execute_result,
 
@@ -743,6 +755,14 @@ class MainController:
             return 3
         retries = getattr(config, "self_correction_retries", 3)
         return max(1, min(int(retries or 3), 5))
+
+    def _query_max_rows(self) -> int:
+        rows = getattr(self.profile, "query_max_rows", 1000)
+        return max(1, min(int(rows or 1000), 1000))
+
+    def _query_timeout_seconds(self) -> int:
+        seconds = getattr(self.profile, "query_timeout_seconds", 10)
+        return max(1, min(int(seconds or 10), 300))
 
 
     def _start_task(
@@ -1027,4 +1047,3 @@ class MainController:
 
 
             self.worker_thread.requestInterruption()
-

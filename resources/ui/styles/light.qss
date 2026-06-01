@@ -695,6 +695,15 @@ QGroupBox#vqbGroupBox::title {
     padding: 0 4px;
 }
 
+QScrollArea#vqbScrollArea {
+    background-color: #ffffff;
+    border: 1px solid #d9e1ec;
+}
+QScrollArea#vqbScrollArea > QWidget,
+QScrollArea#vqbScrollArea QWidget#vqbScrollContent {
+    background-color: #ffffff;
+}
+
 QLineEdit#vqbColSearchInput {
     min-height: 24px;
     max-height: 24px;

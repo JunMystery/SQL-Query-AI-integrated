@@ -98,14 +98,17 @@ class ConnectionManagerDialog(QDialog):
         self.add_button.setText(tr("dialogs.conn_mgr_btn_add", "+ Thêm mới"))
         self.edit_button.setText(tr("dialogs.conn_mgr_btn_edit", "Edit"))
         self.delete_button.setText(tr("dialogs.conn_mgr_btn_delete", "- Xóa"))
-        self.test_button.setText(tr("dialogs.conn_form_btn_test", "Test Connection"))
+        self.test_button.setText(tr("dialogs.conn_mgr_btn_config_test", "Cấu hình & kiểm tra"))
         self.password_button.setText(tr("dialogs.conn_mgr_btn_change_pw", "Đổi mật khẩu"))
         self.close_button.setText(tr("dialogs.bookmarks_btn_close", "Đóng"))
 
     def _refresh_list(self) -> None:
         self.profile_list.clear()
         for profile in self.profiles:
-            item = QListWidgetItem(f"{profile.name}  |  {profile.driver}  |  {profile.database or profile.extra}")
+            item = QListWidgetItem(
+                f"{profile.name}  |  {profile.driver}  |  {profile.database or profile.extra}"
+                f"  |  Limit {profile.query_max_rows}  |  Timeout {profile.query_timeout_seconds}s"
+            )
             item.setData(Qt.ItemDataRole.UserRole, profile)
             item.setToolTip(profile.description or profile.name)
             self.profile_list.addItem(item)
@@ -152,7 +155,8 @@ class ConnectionManagerDialog(QDialog):
         if index < 0:
             return
         dialog = ConnectionFormDialog(self.database_manager, self.profiles[index], self)
-        dialog.setWindowTitle(tr("dialogs.conn_form_btn_test", "Test Connection"))
+        dialog.setWindowTitle(tr("dialogs.conn_mgr_btn_config_test", "Cấu hình & kiểm tra"))
+        dialog.select_test_tab()
         dialog.exec()
 
     def _change_password(self) -> None:

@@ -52,7 +52,9 @@ class LoginController:
                         port=p.port,
                         username=target_user,
                         description=p.description,
-                        extra=p.extra
+                        extra=p.extra,
+                        query_max_rows=p.query_max_rows,
+                        query_timeout_seconds=p.query_timeout_seconds,
                     )
                     updated = True
                 break

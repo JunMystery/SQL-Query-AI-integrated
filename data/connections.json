@@ -3,10 +3,10 @@
     {
       "name": "Demo",
       "driver": "MYSQL",
-      "database": "healthassistant",
+      "database": "HealthAssistant",
       "host": "127.0.0.1",
       "port": 3306,
-      "username": "jun",
+      "username": "root",
       "description": "Demo",
       "extra": ""
     }

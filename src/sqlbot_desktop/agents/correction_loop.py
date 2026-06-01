@@ -1,7 +1,6 @@
 """Correction Loop module to validate syntax, test execution, and correct SQL errors."""
 
 from __future__ import annotations
-import sqlglot
 from typing import Any
 from sqlalchemy import text
 
@@ -30,15 +29,17 @@ class CorrectionLoop:
         """
         current_query = query.strip()
         dialect_mapped = self._map_dialect(dialect)
+        sqlglot_parser = self._load_sqlglot()
 
         for attempt in range(max_attempts):
             error_msg = None
 
             # 1. Parse validation using sqlglot
-            try:
-                sqlglot.parse_one(current_query, read=dialect_mapped)
-            except Exception as e:
-                error_msg = f"SQL Syntax Error: {e}"
+            if sqlglot_parser is not None:
+                try:
+                    sqlglot_parser.parse_one(current_query, read=dialect_mapped)
+                except Exception as e:
+                    error_msg = f"SQL Syntax Error: {e}"
 
             # 2. Database validation if connection is provided and syntax is okay
             if not error_msg and db_connection is not None:
@@ -64,6 +65,13 @@ class CorrectionLoop:
             current_query = self._call_ai_to_fix(current_query, error_msg, prompt_context)
 
         return current_query
+
+    def _load_sqlglot(self) -> Any | None:
+        try:
+            import sqlglot
+        except ImportError:
+            return None
+        return sqlglot
 
     def _map_dialect(self, dialect: str) -> str:
         d = dialect.lower().strip()

@@ -18,6 +18,8 @@ class ConnectionProfile:
     username: str = ""
     description: str = ""
     extra: str = ""
+    query_max_rows: int = 1000
+    query_timeout_seconds: int = 10
 
     @property
     def display_name(self) -> str:
@@ -39,6 +41,8 @@ class ConnectionProfile:
             "username": self.username,
             "description": self.description,
             "extra": self.extra,
+            "query_max_rows": self.query_max_rows,
+            "query_timeout_seconds": self.query_timeout_seconds,
         }
 
 

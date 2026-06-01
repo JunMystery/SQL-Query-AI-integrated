@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
+    QStackedWidget,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from sqlbot_desktop.models.entities import ConnectionProfile
@@ -42,7 +48,7 @@ class ConnectionFormDialog(QDialog):
         self.saved_profile: ConnectionProfile | None = None
 
         self.setModal(True)
-        self.setMinimumSize(560, 560)
+        self.setMinimumSize(760, 580)
 
         self.name_input = QLineEdit()
         self.description_input = QLineEdit()
@@ -60,6 +66,15 @@ class ConnectionFormDialog(QDialog):
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.extra_input = QTextEdit()
         self.extra_input.setMaximumHeight(90)
+        self.query_max_rows_input = QSpinBox()
+        self.query_max_rows_input.setRange(1, 1000)
+        self.query_max_rows_input.setSingleStep(50)
+        self.query_max_rows_input.setValue(1000)
+        self.query_timeout_input = QSpinBox()
+        self.query_timeout_input.setRange(1, 300)
+        self.query_timeout_input.setSingleStep(1)
+        self.query_timeout_input.setValue(10)
+        self.query_timeout_input.setSuffix(" s")
         self.status_label = QLabel("")
         self.status_label.setObjectName("statusLabel")
         self.status_label.setWordWrap(True)
@@ -80,6 +95,8 @@ class ConnectionFormDialog(QDialog):
             username=self.username_input.text().strip(),
             description=self.description_input.text().strip(),
             extra=self.extra_input.toPlainText().strip(),
+            query_max_rows=self.query_max_rows_input.value(),
+            query_timeout_seconds=self.query_timeout_input.value(),
         )
 
     def _build_ui(self) -> None:
@@ -94,9 +111,42 @@ class ConnectionFormDialog(QDialog):
         layout.addWidget(self.title_label)
         layout.addWidget(self.caption_label)
 
-        form = QFormLayout()
-        form.setLabelAlignment(form.labelAlignment())
-        
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(12)
+
+        self.nav_list = QListWidget()
+        self.nav_list.setFixedWidth(180)
+        self.nav_list.setObjectName("connectionSettingsNav")
+        self.nav_list.setStyleSheet("""
+            QListWidget {
+                background-color: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 5px;
+            }
+            QListWidget::item {
+                padding: 10px;
+                border-radius: 5px;
+                font-weight: 600;
+                color: #475569;
+            }
+            QListWidget::item:selected {
+                background-color: #edf6ff;
+                color: #0f62fe;
+            }
+        """)
+
+        self.stack = QStackedWidget()
+        self.stack.setObjectName("connectionSettingsStack")
+        self.stack.setStyleSheet("""
+            QStackedWidget {
+                background-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 14px;
+            }
+        """)
+
         self.lbl_name = QLabel()
         self.lbl_desc = QLabel()
         self.lbl_driver = QLabel()
@@ -106,7 +156,63 @@ class ConnectionFormDialog(QDialog):
         self.lbl_username = QLabel()
         self.lbl_password = QLabel()
         self.lbl_options = QLabel()
+        self.lbl_query_max_rows = QLabel()
+        self.lbl_query_timeout = QLabel()
 
+        self.connection_page = self._build_connection_page()
+        self.guardrails_page = self._build_guardrails_page()
+        self.test_page = self._build_test_page()
+
+        self.stack.addWidget(self._scrollable_page(self.connection_page))
+        self.stack.addWidget(self._scrollable_page(self.guardrails_page))
+        self.stack.addWidget(self._scrollable_page(self.test_page))
+        self.nav_list.currentRowChanged.connect(self.stack.setCurrentIndex)
+
+        content_layout.addWidget(self.nav_list)
+        content_layout.addWidget(self.stack, 1)
+        layout.addLayout(content_layout, 1)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self._save)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+    def _scrollable_page(self, page: QWidget) -> QScrollArea:
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName("connectionSettingsScroll")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setWidget(page)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background-color: transparent;
+                border: 0;
+            }
+            QScrollArea > QWidget > QWidget {
+                background-color: transparent;
+            }
+        """)
+        return scroll_area
+
+    def _build_connection_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        self.connection_page_title = QLabel()
+        self.connection_page_title.setObjectName("dialogTitle")
+        self.connection_page_caption = QLabel()
+        self.connection_page_caption.setObjectName("dialogCaption")
+        self.connection_page_caption.setWordWrap(True)
+        layout.addWidget(self.connection_page_title)
+        layout.addWidget(self.connection_page_caption)
+
+        panel = QFrame()
+        panel.setObjectName("settingsPanel")
+        form = QFormLayout(panel)
+        form.setSpacing(12)
         form.addRow(self.lbl_name, self.name_input)
         form.addRow(self.lbl_desc, self.description_input)
         form.addRow(self.lbl_driver, self.driver_combo)
@@ -117,7 +223,52 @@ class ConnectionFormDialog(QDialog):
         form.addRow(self.lbl_username, self.username_input)
         form.addRow(self.lbl_password, self.password_input)
         form.addRow(self.lbl_options, self.extra_input)
-        layout.addLayout(form)
+        layout.addWidget(panel)
+        layout.addStretch()
+        return page
+
+    def _build_guardrails_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        self.guardrails_page_title = QLabel()
+        self.guardrails_page_title.setObjectName("dialogTitle")
+        self.guardrails_page_caption = QLabel()
+        self.guardrails_page_caption.setObjectName("dialogCaption")
+        self.guardrails_page_caption.setWordWrap(True)
+        layout.addWidget(self.guardrails_page_title)
+        layout.addWidget(self.guardrails_page_caption)
+
+        panel = QFrame()
+        panel.setObjectName("settingsPanel")
+        form = QFormLayout(panel)
+        form.setSpacing(12)
+        form.addRow(self.lbl_query_max_rows, self.query_max_rows_input)
+        form.addRow(self.lbl_query_timeout, self.query_timeout_input)
+        layout.addWidget(panel)
+
+        self.guardrails_hint_label = QLabel()
+        self.guardrails_hint_label.setObjectName("formHint")
+        self.guardrails_hint_label.setWordWrap(True)
+        layout.addWidget(self.guardrails_hint_label)
+        layout.addStretch()
+        return page
+
+    def _build_test_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        self.test_page_title = QLabel()
+        self.test_page_title.setObjectName("dialogTitle")
+        self.test_page_caption = QLabel()
+        self.test_page_caption.setObjectName("dialogCaption")
+        self.test_page_caption.setWordWrap(True)
+        layout.addWidget(self.test_page_title)
+        layout.addWidget(self.test_page_caption)
 
         actions = QHBoxLayout()
         self.test_button = QPushButton()
@@ -129,18 +280,30 @@ class ConnectionFormDialog(QDialog):
         actions.addWidget(self.test_button)
         actions.addWidget(self.schema_button)
         layout.addLayout(actions)
-
         layout.addWidget(self.status_label)
-
-        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        self.button_box.accepted.connect(self._save)
-        self.button_box.rejected.connect(self.reject)
-        layout.addWidget(self.button_box)
+        layout.addStretch()
+        return page
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(tr("dialogs.conn_form_title", "Connection profile"))
         self.title_label.setText(tr("dialogs.conn_form_heading", "Thông tin kết nối"))
         self.caption_label.setText(tr("dialogs.conn_form_caption", "Password chỉ dùng để test hoặc lấy schema, không lưu vào file cấu hình."))
+        current_row = self.nav_list.currentRow()
+        self.nav_list.blockSignals(True)
+        self.nav_list.clear()
+        self.nav_list.addItem(tr("dialogs.conn_form_tab_connection", "Kết nối"))
+        self.nav_list.addItem(tr("dialogs.conn_form_tab_guardrails", "Giới hạn truy vấn"))
+        self.nav_list.addItem(tr("dialogs.conn_form_tab_test", "Kiểm tra & Schema"))
+        self.nav_list.blockSignals(False)
+        self.nav_list.setCurrentRow(current_row if current_row >= 0 else 0)
+
+        self.connection_page_title.setText(tr("dialogs.conn_form_page_connection_title", "Thông tin database"))
+        self.connection_page_caption.setText(tr("dialogs.conn_form_page_connection_caption", "Thiết lập driver, host, database và tài khoản dùng cho profile. Password chỉ dùng để test/lấy schema."))
+        self.guardrails_page_title.setText(tr("dialogs.conn_form_page_guardrails_title", "Giới hạn an toàn"))
+        self.guardrails_page_caption.setText(tr("dialogs.conn_form_page_guardrails_caption", "Các giới hạn này chỉ được cấu hình trong Quản lý kết nối và áp dụng khi user execute SELECT."))
+        self.test_page_title.setText(tr("dialogs.conn_form_page_test_title", "Kiểm tra kết nối"))
+        self.test_page_caption.setText(tr("dialogs.conn_form_page_test_caption", "Test kết nối hiện tại hoặc mở schema annotation sau khi kết nối thành công."))
+        self.guardrails_hint_label.setText(tr("dialogs.conn_form_guardrails_hint", "Limit Query được hard cap ở 1000 dòng. Timeout Database được áp dụng bằng statement_timeout cho PostgreSQL và MAX_EXECUTION_TIME cho MySQL/MariaDB."))
         
         self.lbl_name.setText(tr("dialogs.conn_form_label_name", "Tên profile"))
         self.lbl_desc.setText(tr("dialogs.conn_form_label_desc", "Diễn giải"))
@@ -151,9 +314,13 @@ class ConnectionFormDialog(QDialog):
         self.lbl_username.setText(tr("dialogs.conn_form_label_username", "Username"))
         self.lbl_password.setText(tr("dialogs.conn_form_label_password", "Password test"))
         self.lbl_options.setText(tr("dialogs.conn_form_label_options", "Connection options"))
+        self.lbl_query_max_rows.setText(tr("dialogs.conn_form_label_query_max_rows", "Limit Query tối đa"))
+        self.lbl_query_timeout.setText(tr("dialogs.conn_form_label_query_timeout", "Timeout Database"))
 
         self.name_input.setPlaceholderText(tr("dialogs.conn_form_placeholder_name", "Ví dụ: Production Sales DB"))
         self.description_input.setPlaceholderText(tr("dialogs.conn_form_placeholder_desc", "Ví dụ: CSDL doanh số cho phòng Kinh doanh"))
+        self.query_max_rows_input.setToolTip(tr("dialogs.conn_form_query_max_rows_tooltip", "Số dòng tối đa app được phép tải cho mỗi SELECT. Hard cap là 1000 dòng."))
+        self.query_timeout_input.setToolTip(tr("dialogs.conn_form_query_timeout_tooltip", "Thời gian tối đa cho mỗi SELECT trước khi database timeout."))
 
         self.test_button.setText(tr("dialogs.conn_form_btn_test", "Test Connection"))
         self.schema_button.setText(tr("dialogs.conn_form_btn_schema", "Connect & Get Schema"))
@@ -175,6 +342,9 @@ class ConnectionFormDialog(QDialog):
         self.driver_combo.blockSignals(False)
         self._sync_driver_fields()
 
+    def select_test_tab(self) -> None:
+        self.nav_list.setCurrentRow(2)
+
     def _wire_events(self) -> None:
         self.driver_combo.currentIndexChanged.connect(self._sync_driver_fields)
 
@@ -192,6 +362,8 @@ class ConnectionFormDialog(QDialog):
         self.database_input.setText(profile.database)
         self.username_input.setText(profile.username)
         self.extra_input.setPlainText(profile.extra)
+        self.query_max_rows_input.setValue(max(1, min(int(getattr(profile, "query_max_rows", 1000) or 1000), 1000)))
+        self.query_timeout_input.setValue(max(1, min(int(getattr(profile, "query_timeout_seconds", 10) or 10), 300)))
         self._sync_driver_fields()
 
     def _set_driver(self, driver: str) -> None:
