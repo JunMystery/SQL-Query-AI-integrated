@@ -657,6 +657,26 @@ QLabel#vqbColumnLabel {
     font-size: 12px;
     color: #182230;
 }
+QLabel#vqbColumnLabel:disabled {
+    color: #64748b;
+}
+QCheckBox#vqbColumnCheckBox:disabled {
+    color: #64748b;
+}
+QPushButton#vqbTableGroupHeader {
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid #d9e1ec;
+    border-radius: 6px;
+    background-color: #f8fafc;
+    color: #0f243f;
+    text-align: left;
+    font-weight: 700;
+}
+QPushButton#vqbTableGroupHeader:hover {
+    border-color: #94a3b8;
+    background-color: #eef6ff;
+}
 
 QGroupBox#vqbGroupBox {
     font-weight: bold;
