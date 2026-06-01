@@ -122,6 +122,7 @@ class MainControllerPipelineTests(unittest.TestCase):
         def fake_start_task(title, detail, operation, on_finished, show_busy_panel=True, on_failed=None):
             captured["title"] = title
             captured["detail"] = detail
+            captured["show_busy_panel"] = show_busy_panel
             result = operation()
             on_finished(result)
 
@@ -133,6 +134,7 @@ class MainControllerPipelineTests(unittest.TestCase):
         self.assertEqual(controller.text_to_sql_pipeline.calls[0]["dialect"], "MYSQL")
         self.assertIsNotNone(controller.text_to_sql_pipeline.calls[0]["execute_sql"])
         self.assertEqual(controller.text_to_sql_pipeline.calls[0]["max_retries"], 4)
+        self.assertIs(captured["show_busy_panel"], True)
         self.assertEqual(controller.view.generated_queries, ["SELECT id FROM users;"])
         self.assertEqual(controller.activity_repository.history, [("Lấy user", "SELECT id FROM users;", True)])
         self.assertIn("2 lần", controller.view.status_messages[-1])

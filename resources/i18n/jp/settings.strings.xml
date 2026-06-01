@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">システム設定</string>
+    <string name="tab_ai_config">AI設定</string>
+    <string name="tab_schema_annotation">スキーマ注釈</string>
+    <string name="ai_provider">AIプロバイダ:</string>
+    <string name="ai_api_key">APIキー:</string>
+    <string name="ai_model_name">モデル名:</string>
+    <string name="ai_base_url">ベースURL (任意):</string>
+    <string name="ai_gguf_path">GGUFモデルのパス:</string>
+    <string name="btn_browse">ファイルを選択...</string>
+    <string name="btn_save_config">設定を保存</string>
+    <string name="schema_search_placeholder">テーブル、カラムを検索...</string>
+    <string name="schema_name_header">名前</string>
+    <string name="schema_desc_header">説明</string>
+    <string name="annotation_editor_title">注釈の編集</string>
+    <string name="annotation_table_desc">テーブルの説明:</string>
+    <string name="annotation_col_desc">カラムの説明:</string>
+    <string name="annotation_col_unit">単位:</string>
+    <string name="annotation_col_note">備考:</string>
+    <string name="annotation_data_type">元のデータ型:</string>
+    <string name="btn_save_annotation">注釈を保存</string>
+    <string name="msg_unsaved_changes">保存されていない変更があります。閉じる前に保存しますか？</string>
+
+    <!-- Additional setting keys -->
+    <string name="ai_caption">ローカルGGUFまたはAPIを選択してください。選択中の構成項目のみ表示されます。</string>
+    <string name="ai_ctx_size">コンテキストサイズ (n_ctx)</string>
+    <string name="ai_max_tokens">最大トークン数 (max_tokens)</string>
+    <string name="ai_threads">推論スレッド数</string>
+    <string name="ai_cpu_limit">CPU制限</string>
+    <string name="ai_self_correct">自動修正数</string>
+    <string name="ai_gpu_layers">GPUレイヤー数</string>
+    <string name="ai_threads_hint">ローカルGGUF推論のスレッド数です。これはCPUコア占有率の制限ではありません。</string>
+    <string name="ai_test_placeholder">推論テスト結果...</string>
+    <string name="ai_btn_test">推論テスト</string>
+    <string name="ai_btn_load">モデル読込</string>
+    <string name="ai_btn_unload">モデル解放</string>
+    <string name="ai_local_config">ローカルllama.cppモデルの設定</string>
+    <string name="ai_api_config">サードパーティAPI設定</string>
+    <string name="ai_gguf_path_placeholder">GGUFファイルへのパス</string>
+    <string name="ai_api_endpoint_placeholder">https://api.openai.com/v1/chat/completions</string>
+    <string name="ai_api_model_placeholder">APIモデル名、例: gpt-4o-mini</string>
+    <string name="ai_api_key_placeholder">APIキー (省略可能)</string>
+    <string name="ai_cpu_limit_tooltip">アプリ全体のCPUスレッド制限。0は制限なし、4はi5第11世代ノートPC、RAM 16GB、グラフィックボード非搭載モデルに適しています。</string>
+    <string name="ai_self_correct_tooltip">SELECT実行エラー時のAIによるSQL文の最大自動修正試行回数。デフォルトは3です。</string>
+    <string name="title_choose_gguf">GGUFモデルの選択</string>
+    <string name="ai_btn_scan">GGUFスキャン</string>
+    
+    <string name="schema_caption_hint">データベース構造に日本語の説明、単位、メモを入力してください。これらはデータベースを変更せず、ローカルにのみ保存されます。</string>
+    <string name="annotation_placeholder">👈 リストからテーブルまたはカラムを選択して編集を開始します</string>
+    <string name="annotation_table_placeholder">例：ユーザーアカウント情報</string>
+    <string name="annotation_col_desc_placeholder">例：ユニーク識別子</string>
+    <string name="annotation_col_unit_placeholder">例：円、kg、回 (もしあれば)</string>
+    <string name="annotation_col_note_placeholder">特別メモ、形式、またはサンプル値...</string>
+    <string name="annotation_table_prefix">テーブル:</string>
+    <string name="annotation_column_prefix">カラム:</string>
+    
+    <string name="title_unsaved_changes">未保存の変更</string>
+    <string name="title_invalid_model">無効なモデル</string>
+    <string name="msg_choose_existing_gguf">存在するGGUFファイルを選択してください。</string>
+    <string name="title_api_insufficient">API情報不足</string>
+    <string name="msg_enter_api_endpoint_model">APIエンドポイントとAPIモデル名を入力してください。</string>
+    
+    <string name="msg_invalid_gguf">有効なGGUFモデルが選択されていません。</string>
+    <string name="cpu_no_limit">制限なし</string>
+    <string name="cpu_logical">論理CPU:</string>
+    <string name="cpu_limit_app">アプリ制限:</string>
+    <string name="status_ram_insufficient">RAMが不足する可能性があります</string>
+    <string name="msg_local_gguf_invalid">ローカルGGUFファイルが無効です。</string>
+    <string name="msg_local_gguf_valid">ローカルGGUFは有効です。「モデル読込」を押して読込後、「テスト推論」を使用します。</string>
+    <string name="msg_api_required">APIエンドポイントとモデル名は必須です。</string>
+    <string name="msg_api_valid">API設定は有効です。「モデル読込」を押してモデルを選択してください。</string>
+    
+    <string name="title_import_annotations">注釈のインポート</string>
+    <string name="title_import_error">インポートエラー</string>
+    <string name="msg_annotations_imported">注釈がインポートされました。</string>
+    <string name="title_export_annotations">注釈のエクスポート</string>
+    <string name="title_export_error">エクスポートエラー</string>
+    <string name="msg_annotations_exported">注釈がエクスポートされました。</string>
+    <string name="msg_annotations_saved">注釈を保存しました: </string>
+    <string name="schema_not_loaded">スキーマが読み込まれていません</string>
+    <string name="schema_tooltip_real_table">実際のテーブル名</string>
+    <string name="schema_tooltip_real_column">実際のカラム名</string>
+    <string name="status_loading_local">ローカルGGUFモデルをロード中。</string>
+    <string name="status_checking_api">API設定をチェック中。</string>
+</resources>

@@ -52,7 +52,7 @@ class TestAdvancedSQLAgent(unittest.TestCase):
 
         # Assert
         self.assertIn("SELECT u.id, u.name, SUM(o.amount) AS total", sql)
-        self.assertIn("FROM users u INNER JOIN orders o", sql)
+        self.assertIn("FROM users u LEFT JOIN orders o", sql)
         self.assertIn("GROUP BY u.id, u.name HAVING SUM(o.amount) > 100", sql)
 
     def test_generate_sql_fallback_on_json_failure(self) -> None:

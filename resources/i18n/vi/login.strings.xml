@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="window_title">SQLBot Desktop - Đăng nhập</string>
+    <string name="remember_username">Ghi nhớ tên đăng nhập</string>
+    <string name="btn_connect">Kết nối</string>
+    <string name="btn_manage_connections">Quản lý kết nối</string>
+    <string name="headline">Truy vấn dữ liệu bằng tiếng Việt, chạy AI local.</string>
+    <string name="summary">Đăng nhập vào cấu hình CSDL do IT quản lý, sau đó tạo SQL SELECT từ ngôn ngữ tự nhiên với schema đã được diễn giải.</string>
+    <string name="feature_ai_title">AI local</string>
+    <string name="feature_ai_detail">GGUF trên CPU</string>
+    <string name="feature_safety_title">An toàn</string>
+    <string name="feature_safety_detail">Chỉ thực thi SELECT</string>
+    <string name="feature_db_title">CSDL</string>
+    <string name="feature_db_detail">MySQL và PostgreSQL</string>
+    <string name="feature_context_title">Có ngữ cảnh</string>
+    <string name="feature_context_detail">Schema annotations tiếng Việt</string>
+    <string name="eyebrow">Đăng nhập CSDL</string>
+    <string name="select_connection">Chọn kết nối</string>
+    <string name="caption">Sử dụng tài khoản SQL được cấp để mở phiên làm việc.</string>
+    <string name="label_connection">Connection profile</string>
+    <string name="label_username">Username</string>
+    <string name="placeholder_username">Nhập username SQL</string>
+    <string name="label_password">Password</string>
+    <string name="placeholder_password">Nhập password</string>
+    <string name="hint_manage_connections">Quản lý kết nối yêu cầu mật khẩu IT.</string>
+    <string name="status_ready">Sẵn sàng kết nối.</string>
+    <string name="status_no_profiles">Chưa có connection profile. Hãy mở Quản lý kết nối để tạo mới.</string>
+    <string name="status_invalid_profile">Vui lòng chọn một connection profile hợp lệ.</string>
+    <string name="status_credentials_required">Vui lòng nhập đầy đủ username và password.</string>
+    <string name="status_connecting">Đang kết nối tới {profile_name}...</string>
+    <string name="status_connected">Đang kết nối tới {profile_name}...</string>
+</resources>

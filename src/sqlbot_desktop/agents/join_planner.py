@@ -81,10 +81,35 @@ class JoinPlanner:
             elif f"{old_table}->{new_table}" in override:
                 join_type = override[f"{old_table}->{new_table}"].upper()
             else:
-                # 2. Check nullability of joining columns
-                col1_nullable = self.schema_graph.tables.get(t1, {}).get(c1, {}).get("nullable", True)
-                col2_nullable = self.schema_graph.tables.get(t2, {}).get(c2, {}).get("nullable", True)
-                if col1_nullable or col2_nullable:
+                # 2. Check relationship direction to automatically choose LEFT vs INNER JOIN
+                is_left_join = True # Default to LEFT JOIN for safety
+
+                # Look for explicit foreign keys in schema graph
+                # Option A: new_table is the child (fk owner), referencing old_table (parent)
+                is_new_table_fk_to_old = False
+                for t_from, c_from, t_to, _ in self.schema_graph.explicit_edges:
+                    if t_from == new_table and t_to == old_table:
+                        is_new_table_fk_to_old = True
+                        break
+
+                # Option B: old_table is the child (fk owner), referencing new_table (parent)
+                is_old_table_fk_to_new = False
+                old_fk_col = None
+                for t_from, c_from, t_to, _ in self.schema_graph.explicit_edges:
+                    if t_from == old_table and t_to == new_table:
+                        is_old_table_fk_to_new = True
+                        old_fk_col = c_from
+                        break
+
+                if is_old_table_fk_to_new and old_fk_col:
+                    # If old_table holds the foreign key, check if it's NOT NULL
+                    col_info = self.schema_graph.tables.get(old_table, {}).get(old_fk_col, {})
+                    is_nullable = col_info.get("nullable", True)
+                    # If the foreign key column is NOT NULL, we can safely INNER JOIN the parent
+                    if not is_nullable:
+                        is_left_join = False
+
+                if is_left_join:
                     join_type = "LEFT"
                 else:
                     join_type = "INNER"

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">System Settings</string>
+    <string name="tab_ai_config">AI Settings</string>
+    <string name="tab_schema_annotation">Schema Annotation</string>
+    <string name="ai_provider">AI Provider:</string>
+    <string name="ai_api_key">API Key:</string>
+    <string name="ai_model_name">Model Name:</string>
+    <string name="ai_base_url">Base URL (Optional):</string>
+    <string name="ai_gguf_path">GGUF Path:</string>
+    <string name="btn_browse">Browse...</string>
+    <string name="btn_save_config">Save Configuration</string>
+    <string name="schema_search_placeholder">Search tables, columns...</string>
+    <string name="schema_name_header">Name</string>
+    <string name="schema_desc_header">Description</string>
+    <string name="annotation_editor_title">Edit Annotation</string>
+    <string name="annotation_table_desc">Table Description:</string>
+    <string name="annotation_col_desc">Column Description:</string>
+    <string name="annotation_col_unit">Unit:</string>
+    <string name="annotation_col_note">Note:</string>
+    <string name="annotation_data_type">Original Type:</string>
+    <string name="btn_save_annotation">Save Annotation</string>
+    <string name="msg_unsaved_changes">You have unsaved changes. Do you want to save before closing?</string>
+
+    <!-- Additional setting keys -->
+    <string name="ai_caption">Select Local GGUF or AI API. Only the active configuration group is displayed.</string>
+    <string name="ai_ctx_size">Context Size (n_ctx)</string>
+    <string name="ai_max_tokens">Max Tokens (max_tokens)</string>
+    <string name="ai_threads">Inference Threads</string>
+    <string name="ai_cpu_limit">CPU Limit</string>
+    <string name="ai_self_correct">Self-Correct</string>
+    <string name="ai_gpu_layers">GPU Layers</string>
+    <string name="ai_threads_hint">Number of llama.cpp worker threads for local GGUF inference. This is not a strict CPU limit or CPU core reservation.</string>
+    <string name="ai_test_placeholder">Inference test result...</string>
+    <string name="ai_btn_test">Test Inference</string>
+    <string name="ai_btn_load">Load Model</string>
+    <string name="ai_btn_unload">Unload Model</string>
+    <string name="ai_local_config">Local llama.cpp model configuration</string>
+    <string name="ai_api_config">Third-party API configuration</string>
+    <string name="ai_gguf_path_placeholder">Path to .gguf file</string>
+    <string name="ai_api_endpoint_placeholder">https://api.openai.com/v1/chat/completions</string>
+    <string name="ai_api_model_placeholder">API model, e.g. gpt-4.1-mini</string>
+    <string name="ai_api_key_placeholder">API Key (Optional)</string>
+    <string name="ai_cpu_limit_tooltip">App-wide CPU affinity limit. 0 means unlimited; 4 is suitable for laptop i5 gen 11, RAM 16GB, no discrete GPU.</string>
+    <string name="ai_self_correct_tooltip">Maximum retries for AI to correct SQL statements when SELECT execution fails. Default is 3.</string>
+    <string name="title_choose_gguf">Choose GGUF model</string>
+    <string name="ai_btn_scan">Scan GGUF</string>
+    
+    <string name="schema_caption_hint">Enter descriptions, units, and notes for the database structure. Annotations are stored independently and do not modify the original DB schema.</string>
+    <string name="annotation_placeholder">👈 Select a table or column from the list to start editing</string>
+    <string name="annotation_table_placeholder">e.g. User account information</string>
+    <string name="annotation_col_desc_placeholder">e.g. Unique identifier</string>
+    <string name="annotation_col_unit_placeholder">e.g. USD, kg, times (if any)</string>
+    <string name="annotation_col_note_placeholder">Special notes, formats, or example values...</string>
+    <string name="annotation_table_prefix">Table:</string>
+    <string name="annotation_column_prefix">Column:</string>
+    
+    <string name="title_unsaved_changes">Unsaved Changes</string>
+    <string name="title_invalid_model">Invalid Model</string>
+    <string name="msg_choose_existing_gguf">Please choose a GGUF file that exists.</string>
+    <string name="title_api_insufficient">API Info Missing</string>
+    <string name="msg_enter_api_endpoint_model">Please enter both API endpoint and API model name.</string>
+    
+    <string name="msg_invalid_gguf">No valid GGUF model chosen.</string>
+    <string name="cpu_no_limit">unlimited</string>
+    <string name="cpu_logical">Logical CPU:</string>
+    <string name="cpu_limit_app">App limit:</string>
+    <string name="status_ram_insufficient">RAM might be insufficient</string>
+    <string name="msg_local_gguf_invalid">Local GGUF model path is invalid.</string>
+    <string name="msg_local_gguf_valid">Local GGUF is valid. Press Load Model to load it, then use Generate SQL to test inference.</string>
+    <string name="msg_api_required">API endpoint and model name are required.</string>
+    <string name="msg_api_valid">API settings are valid. Press Load Model to select active API model.</string>
+    
+    <string name="title_import_annotations">Import annotations</string>
+    <string name="title_import_error">Import error</string>
+    <string name="msg_annotations_imported">Annotations imported successfully.</string>
+    <string name="title_export_annotations">Export annotations</string>
+    <string name="title_export_error">Export error</string>
+    <string name="msg_annotations_exported">Annotations exported successfully.</string>
+    <string name="msg_annotations_saved">Annotations saved: </string>
+    <string name="schema_not_loaded">Schema not loaded</string>
+    <string name="schema_tooltip_real_table">Real database table name</string>
+    <string name="schema_tooltip_real_column">Real database column name</string>
+    <string name="status_loading_local">Loading local GGUF model.</string>
+    <string name="status_checking_api">Checking API configurations.</string>
+</resources>

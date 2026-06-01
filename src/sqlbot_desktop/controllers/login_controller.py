@@ -11,6 +11,7 @@ from sqlbot_desktop.controllers.main_controller import MainController
 from sqlbot_desktop.views.dialogs.admin_password_dialog import AdminPasswordDialog
 from sqlbot_desktop.views.dialogs.connection_manager_dialog import ConnectionManagerDialog
 from sqlbot_desktop.views.login_window import LoginWindow
+from sqlbot_desktop.utils.i18n_manager import tr
 
 
 class LoginController:
@@ -63,10 +64,10 @@ class LoginController:
         result = self.database_manager.open_connection(profile, username, password)
         if not result.ok:
             self.view.set_status(result.message)
-            QMessageBox.warning(self.view, "Kết nối thất bại", result.message)
+            QMessageBox.warning(self.view, tr("dialogs.conn_form_title_failed_connection", "Kết nối thất bại"), result.message)
             return
 
-        self.view.set_status(f"Đã kết nối: {profile.name}")
+        self.view.set_status(tr("login.status_connected", "Đã kết nối: ") + f"{profile.name}")
 
         self.main_controller = MainController(profile, self.database_manager, result.connection_name)
         self.main_controller.show()

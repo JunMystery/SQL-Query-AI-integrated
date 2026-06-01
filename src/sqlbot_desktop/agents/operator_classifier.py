@@ -52,7 +52,7 @@ class OperatorClassifier:
         """Tokenizes conditional expression for parser consumption."""
         pattern = (
             r"\b(?:SUM|AVG|COUNT|MAX|MIN)\s*\([^)]*\)|"
-            r"\(|\)|\bAND\b|\bOR\b|\bBETWEEN\b|\bIN\b|\bLIKE\b|\bEXISTS\b|"
+            r"\(|\)|\bAND\b|\bOR\b|\bBETWEEN\b|\bIN\b|\bLIKE\b|\bNOT\s+EXISTS\b|\bEXISTS\b|"
             r"\bIS\s+NOT\s+NULL\b|\bIS\s+NULL\b|'[^']*'|[^,\s\(\)]+"
         )
         tokens = re.findall(pattern, expression, re.IGNORECASE)
@@ -60,8 +60,10 @@ class OperatorClassifier:
         for t in tokens:
             t_strip = t.strip()
             t_upper = t_strip.upper()
+            # Replace multiple spaces inside NOT EXISTS with single space
+            t_upper = re.sub(r"\s+", " ", t_upper)
             if t_upper in (
-                "AND", "OR", "BETWEEN", "IN", "LIKE", "EXISTS",
+                "AND", "OR", "BETWEEN", "IN", "LIKE", "EXISTS", "NOT EXISTS",
                 "IS NULL", "IS NOT NULL", "(", ")"
             ):
                 cleaned.append(t_upper)
@@ -127,9 +129,9 @@ class OperatorClassifier:
             return parse_condition()
 
         def parse_condition() -> ConditionNode:
-            # Check for leading EXISTS
-            if peek() == "EXISTS":
-                op = consume("EXISTS")
+            # Check for leading EXISTS or NOT EXISTS
+            if peek() in ("EXISTS", "NOT EXISTS"):
+                op = consume()
                 consume("(")
                 # Inside exists, we consume everything up to matching ) as value
                 subquery_parts = []

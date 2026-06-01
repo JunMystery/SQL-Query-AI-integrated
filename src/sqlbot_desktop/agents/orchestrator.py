@@ -40,7 +40,10 @@ class Orchestrator:
         target_tables: list[str],
         select_columns: list[str],
         filter_expression: str | None = None,
-        join_overrides: dict[str, str] | None = None
+        join_overrides: dict[str, str] | None = None,
+        group_by_columns: list[str] | None = None,
+        order_by_columns: list[str] | None = None,
+        limit_count: int | None = None
     ) -> str:
         """
         Coordinates the pipeline:
@@ -61,13 +64,15 @@ class Orchestrator:
             for part in sub_parts:
                 # Recursively generate query for each part
                 q_sub = self._build_single_query(
-                    start_table, target_tables, select_columns, filter_expression, join_overrides
+                    start_table, target_tables, select_columns, filter_expression, join_overrides,
+                    group_by_columns, order_by_columns, limit_count
                 )
                 queries.append(q_sub)
             raw_sql = SetOpHandler.stitch_queries(queries, set_op)
         else:
             raw_sql = self._build_single_query(
-                start_table, target_tables, select_columns, filter_expression, join_overrides
+                start_table, target_tables, select_columns, filter_expression, join_overrides,
+                group_by_columns, order_by_columns, limit_count
             )
 
         # 2. Validation & self-correction loop
@@ -86,7 +91,10 @@ class Orchestrator:
         target_tables: list[str],
         select_columns: list[str],
         filter_expression: str | None = None,
-        join_overrides: dict[str, str] | None = None
+        join_overrides: dict[str, str] | None = None,
+        group_by_columns: list[str] | None = None,
+        order_by_columns: list[str] | None = None,
+        limit_count: int | None = None
     ) -> str:
         # Generate Join Clauses
         plan = self.join_planner.plan_joins(start_table, target_tables, join_overrides)
@@ -135,7 +143,12 @@ class Orchestrator:
             where_conds, having_conds = GroupingHandler.formulate_having(filters_list)
 
         # Build SQL structure
-        sql_parts = ["SELECT " + ", ".join(aliased_selects)]
+        select_clause = "SELECT "
+        if limit_count is not None and self.dialect == "mssql":
+            select_clause += f"TOP {limit_count} "
+        select_clause += ", ".join(aliased_selects)
+
+        sql_parts = [select_clause]
         start_alias = aliases.get(start_table, "t")
         sql_parts.append(f"FROM {start_table} {start_alias}")
 
@@ -146,12 +159,54 @@ class Orchestrator:
             sql_parts.append("WHERE " + " AND ".join(where_conds))
 
         # Check for GROUP BY columns
-        group_by = GroupingHandler.parse_group_by(aliased_selects)
-        if group_by:
-            sql_parts.append("GROUP BY " + ", ".join(group_by))
+        if group_by_columns:
+            aliased_group_by = []
+            for col in group_by_columns:
+                aliased_col = col
+                found = False
+                for tbl, alias in aliases.items():
+                    if f"{tbl}." in aliased_col:
+                        aliased_col = re.sub(rf"\b{tbl}\.", f"{alias}.", aliased_col)
+                        found = True
+                if not found:
+                    start_alias = aliases.get(start_table, "t")
+                    aliased_col = f"{start_alias}.{aliased_col}"
+                aliased_group_by.append(aliased_col)
+            sql_parts.append("GROUP BY " + ", ".join(aliased_group_by))
+        else:
+            group_by = GroupingHandler.parse_group_by(aliased_selects)
+            if group_by:
+                sql_parts.append("GROUP BY " + ", ".join(group_by))
 
         if having_conds:
             sql_parts.append("HAVING " + " AND ".join(having_conds))
+
+        # Check for ORDER BY columns
+        if order_by_columns:
+            aliased_orders = []
+            for item in order_by_columns:
+                parts = item.strip().split()
+                col = parts[0]
+                direction = parts[1] if len(parts) > 1 else ""
+
+                aliased_col = col
+                found = False
+                for tbl, alias in aliases.items():
+                    if f"{tbl}." in aliased_col:
+                        aliased_col = re.sub(rf"\b{tbl}\.", f"{alias}.", aliased_col)
+                        found = True
+                if not found:
+                    start_alias = aliases.get(start_table, "t")
+                    aliased_col = f"{start_alias}.{aliased_col}"
+
+                if direction:
+                    aliased_orders.append(f"{aliased_col} {direction}")
+                else:
+                    aliased_orders.append(aliased_col)
+            sql_parts.append("ORDER BY " + ", ".join(aliased_orders))
+
+        if limit_count is not None and self.dialect != "mssql":
+            sql_parts.append(f"LIMIT {limit_count}")
 
         return " ".join(sql_parts)
 
@@ -189,8 +244,8 @@ class Orchestrator:
             return f"{aliased_col} LIKE {vals[0]}"
         elif op in ("IS NULL", "IS NOT NULL"):
             return f"{aliased_col} {op}"
-        elif op == "EXISTS" and vals:
-            return f"EXISTS ({vals[0]})"
+        elif op in ("EXISTS", "NOT EXISTS") and vals:
+            return f"{op} ({vals[0]})"
         elif vals:
             return f"{aliased_col} {op} {vals[0]}"
         return f"{aliased_col} = ''"

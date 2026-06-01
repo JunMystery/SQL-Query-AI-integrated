@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="window_title">Hướng dẫn sử dụng điều kiện và chức năng</string>
+    <string name="tab_overview">💡 Tổng quan</string>
+    <string name="tab_equal">🎯 Toán tử =</string>
+    <string name="tab_comparison">⚡ Toán tử &gt;, &lt;, ...</string>
+    <string name="tab_like">🔍 Toán tử LIKE</string>
+    <string name="tab_between">📅 Toán tử BETWEEN</string>
+    <string name="tab_in">📦 Toán tử IN</string>
+    <string name="tab_null">⭕ Toán tử IS NULL</string>
+    <string name="tab_exists">🧩 Toán tử EXISTS</string>
+    <string name="tab_groupby">📊 Gom nhóm GROUP BY</string>
+    <string name="tab_orderby">🔀 Sắp xếp ORDER BY</string>
+    <string name="tab_limit">🛑 Giới hạn dòng LIMIT</string>
+
+    <string name="overview_title">💡 Hướng dẫn Tổng quan</string>
+    <string name="overview_body">&lt;p&gt;Chào mừng đến với chức năng &lt;b&gt;Tự Build Query bằng lựa chọn&lt;/b&gt;!&lt;/p&gt;&lt;p&gt;Chức năng này giúp bạn thiết lập truy vấn SQL mong muốn thông qua việc lựa chọn bảng, cột và các điều kiện lọc mà không cần viết mã SQL thủ công.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Chọn Bảng chính:&lt;/b&gt; Thiết lập bảng nguồn đầu tiên cho mệnh đề FROM.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Chọn các Cột:&lt;/b&gt; Tích chọn cột cần hiển thị. Nếu tích chọn cột thuộc bảng khác, hệ thống sẽ tự động tìm quan hệ khóa ngoại và tạo mệnh đề JOIN tự động.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Điều kiện lọc (WHERE):&lt;/b&gt; Tạo thêm các bộ lọc giá trị thông qua nút \'Thêm điều kiện\'.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="equal_title">🎯 Toán tử Bằng / Khác (=, !=)</string>
+    <string name="equal_body">&lt;p&gt;So sánh chính xác giá trị của một cột.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Chọn cột, chọn toán tử &lt;code&gt;=&lt;/code&gt; (Bằng) hoặc &lt;code&gt;!=&lt;/code&gt; (Khác), sau đó nhập giá trị cần lọc.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt; &lt;code&gt;status = \'Active\'&lt;/code&gt; hoặc &lt;code&gt;role_id = 1&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;i&gt;Lưu ý:&lt;/i&gt; Nếu cột có kiểu văn bản, hệ thống sẽ tự động thêm dấu nháy đơn bao quanh giá trị.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="comparison_title">⚡ Toán tử So sánh lớn/nhỏ (&gt;, &lt;, &gt;=, &lt;=)</string>
+    <string name="comparison_body">&lt;p&gt;So sánh khoảng giá trị lớn hơn hoặc nhỏ hơn, thường áp dụng cho dữ liệu số, ngày tháng.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt; &lt;code&gt;price &gt; 500&lt;/code&gt; hoặc &lt;code&gt;created_at &gt;= \'2026-01-01\'&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;Hữu ích khi tìm các đơn hàng có giá trị cao, tài khoản đăng ký mới gần đây, hoặc thống kê tuổi tác.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="like_title">🔍 Toán tử LIKE (Tìm kiếm mẫu)</string>
+    <string name="like_body">&lt;p&gt;Tìm kiếm chuỗi văn bản khớp với mẫu tìm kiếm (có phân biệt hoặc không phân biệt hoa thường tùy DB).&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Sử dụng ký tự đại diện &lt;code&gt;%&lt;/code&gt; (đại diện cho một nhóm ký tự bất kỳ) hoặc &lt;code&gt;_&lt;/code&gt; (đại diện cho đúng 1 ký tự).&lt;/li&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt;&lt;ul&gt;&lt;li&gt;Nhập &lt;code&gt;%An%&lt;/code&gt; để tìm tất cả các tên chứa từ \'An\' (ví dụ: Bình An, Thanh An).&lt;/li&gt;&lt;li&gt;Nhập &lt;code&gt;An%&lt;/code&gt; để tìm các tên bắt đầu bằng \'An\'.&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="between_title">📅 Toán tử BETWEEN (Trong khoảng)</string>
+    <string name="between_body">&lt;p&gt;Lọc các bản ghi có giá trị nằm trong một khoảng xác định (bao gồm cả 2 đầu mút).&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Nhập hai giá trị ngăn cách nhau bởi chữ &lt;code&gt;AND&lt;/code&gt; hoặc dấu phẩy &lt;code&gt;,&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt;&lt;ul&gt;&lt;li&gt;Nhập &lt;code&gt;10 AND 100&lt;/code&gt; (hoặc &lt;code&gt;10, 100&lt;/code&gt;) → Sinh ra: &lt;code&gt;col BETWEEN 10 AND 100&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Nhập &lt;code&gt;2026-01-01 AND 2026-05-31&lt;/code&gt; → Sinh ra: &lt;code&gt;col BETWEEN \'2026-01-01\' AND \'2026-05-31\'&lt;/code&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="in_title">📦 Toán tử IN (Trong danh sách)</string>
+    <string name="in_body">&lt;p&gt;Kiểm tra xem giá trị của cột có thuộc một danh sách các giá trị cho trước hay không.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Nhập các giá trị cách nhau bằng dấu phẩy &lt;code&gt;,&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt; Nhập &lt;code&gt;Active, Pending&lt;/code&gt; → Sinh ra: &lt;code&gt;status IN (\'Active\', \'Pending\')&lt;/code&gt;.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="null_title">⭕ Toán tử IS NULL / IS NOT NULL</string>
+    <string name="null_body">&lt;p&gt;Kiểm tra xem một cột có rỗng (NULL) hoặc không rỗng hay không.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt; &lt;code&gt;email IS NULL&lt;/code&gt; để lọc những người dùng chưa nhập email.&lt;/li&gt;&lt;li&gt;&lt;i&gt;Lưu ý:&lt;/i&gt; Khi chọn toán tử này, ô nhập giá trị bên phải sẽ tự động được ẩn đi.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="exists_title">🧩 Toán tử EXISTS / NOT EXISTS</string>
+    <string name="exists_body">&lt;p&gt;Kiểm tra sự tồn tại của dữ liệu bằng câu truy vấn con (Subquery).&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Chọn toán tử &lt;code&gt;EXISTS&lt;/code&gt; hoặc &lt;code&gt;NOT EXISTS&lt;/code&gt;, sau đó nhập câu subquery đầy đủ vào ô giá trị.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Ví dụ subquery:&lt;/b&gt; &lt;code&gt;SELECT 1 FROM orders WHERE orders.user_id = users.id&lt;/code&gt;&lt;/li&gt;&lt;li&gt;&lt;b&gt;Kết quả SQL:&lt;/b&gt; &lt;code&gt;EXISTS (SELECT 1 FROM orders WHERE orders.user_id = users.id)&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Hữu ích khi bạn muốn lọc những người dùng có ít nhất một đơn hàng (EXISTS) hoặc không có đơn hàng nào (NOT EXISTS).&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="groupby_title">📊 Gom nhóm dữ liệu (GROUP BY)</string>
+    <string name="groupby_body">&lt;p&gt;Sử dụng khi bạn muốn nhóm các dòng dữ liệu có cùng giá trị lại với nhau, thường kết hợp với các hàm tính toán như SUM, COUNT, AVG, MIN, MAX.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Nhấp chuột phải vào cột ở danh sách \'Sắp xếp cột\' để chọn hàm tính toán (ví dụ: COUNT), sau đó nhấn nút \'Thêm gom nhóm\' ở mục \'Gom nhóm (GROUP BY)\' để chọn cột cần gom nhóm.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Ví dụ:&lt;/b&gt; Muốn đếm số lượng khách hàng theo từng thành phố:&lt;ul&gt;&lt;li&gt;Chọn cột hiển thị: &lt;code&gt;city&lt;/code&gt; và &lt;code&gt;COUNT(id)&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Thêm dòng Gom nhóm: chọn cột &lt;code&gt;city&lt;/code&gt;&lt;/li&gt;&lt;li&gt;SQL sinh ra: &lt;code&gt;SELECT city, COUNT(id) FROM users GROUP BY city&lt;/code&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="orderby_title">🔀 Sắp xếp kết quả (ORDER BY)</string>
+    <string name="orderby_body">&lt;p&gt;Sắp xếp thứ tự hiển thị của các kết quả trả về theo chiều tăng dần hoặc giảm dần.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Nhấn nút \'Thêm sắp xếp\' ở bảng \'Sắp xếp kết quả (ORDER BY)\', chọn cột muốn sắp xếp và chọn chiều (Tăng dần - ASC hoặc Giảm dần - DESC).&lt;/li&gt;&lt;li&gt;Có thể thêm nhiều cột sắp xếp khác nhau để ưu tiên thứ tự (ví dụ: sắp xếp theo Ngày tạo giảm dần, sau đó theo Tên tăng dần).&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="limit_title">🛑 Giới hạn dòng (LIMIT / TOP)</string>
+    <string name="limit_body">&lt;p&gt;Giới hạn số lượng bản ghi tối đa trả về từ câu truy vấn.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Tầm quan trọng:&lt;/b&gt; Khi cơ sở dữ liệu (CSDL) có số lượng dữ liệu lớn (hàng triệu dòng), truy vấn toàn bộ sẽ gây chậm hệ thống, treo ứng dụng hoặc tràn bộ nhớ. Việc giới hạn dòng giúp ứng dụng phản hồi cực nhanh.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Cách dùng:&lt;/b&gt; Nhập số lượng dòng tối đa mong muốn vào ô &lt;b&gt;\'Giới hạn dòng:\'&lt;/b&gt;. Để trống nếu muốn lấy toàn bộ dữ liệu.&lt;/li&gt;&lt;li&gt;Hệ thống tự động biên dịch sang &lt;code&gt;LIMIT N&lt;/code&gt; hoặc &lt;code&gt;TOP N&lt;/code&gt; phù hợp với CSDL hiện tại.&lt;/li&gt;&lt;/ul&gt;</string>
+</resources>

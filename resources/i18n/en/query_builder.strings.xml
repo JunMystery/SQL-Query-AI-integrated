@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_table">Select Table</string>
+    <string name="group_columns">Select Columns</string>
+    <string name="search_columns_placeholder">Search columns...</string>
+    <string name="btn_selected_only">Selected 👁️</string>
+    <string name="btn_columns_order">Column Order ⇅</string>
+    <string name="btn_columns_order_short">Order</string>
+    <string name="checkbox_distinct">Remove duplicates</string>
+    <string name="label_limit">Row Limit:</string>
+    <string name="limit_placeholder">No limit</string>
+    <string name="group_where">Filters (WHERE)</string>
+    <string name="btn_add_condition">Add Condition ➕</string>
+    <string name="btn_guide">Guide 📖</string>
+    <string name="group_groupby">Grouping (GROUP BY)</string>
+    <string name="btn_add_groupby">Add Grouping ➕</string>
+    <string name="group_orderby">Sort Results (ORDER BY)</string>
+    <string name="btn_add_orderby">Add Sort ➕</string>
+    <string name="btn_delete">Delete</string>
+    <string name="condition_value_placeholder">Value...</string>
+    <string name="condition_value_to_placeholder">To Value...</string>
+    <string name="sort_asc">Ascending (ASC)</string>
+    <string name="sort_desc">Descending (DESC)</string>
+    <string name="main_table_prefix">Main Table:</string>
+    <string name="joined_table_prefix">Joined Table:</string>
+    <string name="btn_clear_selected">Clear all selected ❌</string>
+</resources>

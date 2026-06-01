@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="window_title">SQLBot Desktop - Login</string>
+    <string name="remember_username">Remember username</string>
+    <string name="btn_connect">Connect</string>
+    <string name="btn_manage_connections">Manage Connections</string>
+    <string name="headline">Query database with natural language, run local AI.</string>
+    <string name="summary">Login to database configurations managed by IT, then generate SQL SELECT from natural language with annotated schemas.</string>
+    <string name="feature_ai_title">Local AI</string>
+    <string name="feature_ai_detail">GGUF on CPU</string>
+    <string name="feature_safety_title">Secure</string>
+    <string name="feature_safety_detail">Only executes SELECT</string>
+    <string name="feature_db_title">Database</string>
+    <string name="feature_db_detail">MySQL and PostgreSQL</string>
+    <string name="feature_context_title">Contextual</string>
+    <string name="feature_context_detail">Rich schema annotations</string>
+    <string name="eyebrow">Database Login</string>
+    <string name="select_connection">Select Connection</string>
+    <string name="caption">Use your assigned SQL account to open a session.</string>
+    <string name="label_connection">Connection profile</string>
+    <string name="label_username">Username</string>
+    <string name="placeholder_username">Enter SQL username</string>
+    <string name="label_password">Password</string>
+    <string name="placeholder_password">Enter password</string>
+    <string name="hint_manage_connections">Managing connections requires IT password.</string>
+    <string name="status_ready">Ready to connect.</string>
+    <string name="status_no_profiles">No connection profile. Open Manage Connections to create one.</string>
+    <string name="status_invalid_profile">Please select a valid connection profile.</string>
+    <string name="status_credentials_required">Please enter both username and password.</string>
+    <string name="status_connecting">Connecting to {profile_name}...</string>
+    <string name="status_connected">Connected to {profile_name}</string>
+</resources>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Cài đặt hệ thống</string>
+    <string name="tab_ai_config">Cài đặt AI</string>
+    <string name="tab_schema_annotation">Chú thích CSDL</string>
+    <string name="ai_provider">Nhà cung cấp AI:</string>
+    <string name="ai_api_key">API Key:</string>
+    <string name="ai_model_name">Tên Model:</string>
+    <string name="ai_base_url">Base URL (Tùy chọn):</string>
+    <string name="ai_gguf_path">Đường dẫn GGUF:</string>
+    <string name="btn_browse">Chọn file...</string>
+    <string name="btn_save_config">Lưu cấu hình</string>
+    <string name="schema_search_placeholder">Tìm kiếm bảng, cột...</string>
+    <string name="schema_name_header">Tên</string>
+    <string name="schema_desc_header">Diễn giải</string>
+    <string name="annotation_editor_title">Chỉnh sửa chú thích</string>
+    <string name="annotation_table_desc">Diễn giải bảng:</string>
+    <string name="annotation_col_desc">Diễn giải cột:</string>
+    <string name="annotation_col_unit">Đơn vị:</string>
+    <string name="annotation_col_note">Ghi chú thêm:</string>
+    <string name="annotation_data_type">Kiểu dữ liệu gốc:</string>
+    <string name="btn_save_annotation">Lưu chú thích</string>
+    <string name="msg_unsaved_changes">Bạn có thay đổi chưa lưu. Bạn có muốn lưu trước khi đóng không?</string>
+
+    <!-- Additional setting keys -->
+    <string name="ai_caption">Chọn Local GGUF hoặc API AI. Chỉ nhóm cấu hình đang chọn được hiển thị.</string>
+    <string name="ai_ctx_size">Context Size (n_ctx)</string>
+    <string name="ai_max_tokens">Max Tokens (max_tokens)</string>
+    <string name="ai_threads">Luồng suy luận LLM</string>
+    <string name="ai_cpu_limit">Giới hạn CPU</string>
+    <string name="ai_self_correct">Tự sửa lỗi</string>
+    <string name="ai_gpu_layers">GPU Layers</string>
+    <string name="ai_threads_hint">Thiết lập này là số worker thread llama.cpp dùng khi suy luận GGUF local. Đây không phải giới hạn phần trăm CPU hoặc số core CPU được giữ riêng.</string>
+    <string name="ai_test_placeholder">Kết quả kiểm tra suy luận...</string>
+    <string name="ai_btn_test">Inference Test</string>
+    <string name="ai_btn_load">Load Model</string>
+    <string name="ai_btn_unload">Unload Model</string>
+    <string name="ai_local_config">Cấu hình local model llama.cpp</string>
+    <string name="ai_api_config">Cấu hình API bên thứ ba</string>
+    <string name="ai_gguf_path_placeholder">Đường dẫn file .gguf</string>
+    <string name="ai_api_endpoint_placeholder">https://api.openai.com/v1/chat/completions</string>
+    <string name="ai_api_model_placeholder">API model, ví dụ gpt-4.1-mini</string>
+    <string name="ai_api_key_placeholder">API Key (Có thể bỏ trống)</string>
+    <string name="ai_cpu_limit_tooltip">Giới hạn CPU affinity của toàn bộ app. 0 nghĩa là không giới hạn; 4 phù hợp laptop i5 gen 11, RAM 16GB, không VGA rời.</string>
+    <string name="ai_self_correct_tooltip">Số lần tối đa AI sinh lại SQL khi SELECT bị lỗi execution. Mặc định 3.</string>
+    <string name="title_choose_gguf">Chọn GGUF model</string>
+    <string name="ai_btn_scan">Scan GGUF</string>
+    
+    <string name="schema_caption_hint">Nhập diễn giải tiếng Việt, đơn vị và ghi chú cho cấu trúc dữ liệu. Dữ liệu được lưu trữ độc lập không ảnh hưởng CSDL gốc.</string>
+    <string name="annotation_placeholder">👈 Chọn một bảng hoặc cột từ danh sách để bắt đầu chỉnh sửa</string>
+    <string name="annotation_table_placeholder">Ví dụ: Thông tin tài khoản người dùng</string>
+    <string name="annotation_col_desc_placeholder">Ví dụ: Mã định danh duy nhất</string>
+    <string name="annotation_col_unit_placeholder">Ví dụ: VND, kg, lượt (nếu có)</string>
+    <string name="annotation_col_note_placeholder">Các ghi chú đặc biệt, định dạng hoặc giá trị ví dụ...</string>
+    <string name="annotation_table_prefix">Bảng:</string>
+    <string name="annotation_column_prefix">Cột:</string>
+    
+    <string name="title_unsaved_changes">Có thay đổi chưa lưu</string>
+    <string name="title_invalid_model">Model không hợp lệ</string>
+    <string name="msg_choose_existing_gguf">Vui lòng chọn file .gguf tồn tại.</string>
+    <string name="title_api_insufficient">API chưa đủ</string>
+    <string name="msg_enter_api_endpoint_model">Vui lòng nhập API endpoint và API model.</string>
+    
+    <string name="msg_invalid_gguf">Chưa chọn model GGUF hợp lệ.</string>
+    <string name="cpu_no_limit">không giới hạn</string>
+    <string name="cpu_logical">Logical CPU:</string>
+    <string name="cpu_limit_app">Giới hạn app:</string>
+    <string name="status_ram_insufficient">RAM có thể không đủ</string>
+    <string name="msg_local_gguf_invalid">Local GGUF chưa hợp lệ.</string>
+    <string name="msg_local_gguf_valid">Local GGUF hợp lệ. Bấm Load Model để load model, sau đó dùng Generate SQL để test inference.</string>
+    <string name="msg_api_required">API endpoint và API model là bắt buộc.</string>
+    <string name="msg_api_valid">API settings hợp lệ. Bấm Load Model để chọn API model.</string>
+    
+    <string name="title_import_annotations">Import annotations</string>
+    <string name="title_import_error">Import lỗi</string>
+    <string name="msg_annotations_imported">Đã import annotations.</string>
+    <string name="title_export_annotations">Export annotations</string>
+    <string name="title_export_error">Export lỗi</string>
+    <string name="msg_annotations_exported">Đã export annotations.</string>
+    <string name="msg_annotations_saved">Đã lưu annotations: </string>
+    <string name="schema_not_loaded">Chưa tải schema</string>
+    <string name="schema_tooltip_real_table">Tên table thật trong CSDL</string>
+    <string name="schema_tooltip_real_column">Tên column thật trong CSDL</string>
+    <string name="status_loading_local">Đang load model GGUF local.</string>
+    <string name="status_checking_api">Đang kiểm tra cấu hình API AI.</string>
+</resources>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="window_title">Guide: How to Use Conditions and Build Queries</string>
+    <string name="tab_overview">💡 Overview</string>
+    <string name="tab_equal">🎯 Operator =</string>
+    <string name="tab_comparison">⚡ Operators &gt;, &lt;, ...</string>
+    <string name="tab_like">🔍 Operator LIKE</string>
+    <string name="tab_between">📅 Operator BETWEEN</string>
+    <string name="tab_in">📦 Operator IN</string>
+    <string name="tab_null">⭕ Operator IS NULL</string>
+    <string name="tab_exists">🧩 Operator EXISTS</string>
+    <string name="tab_groupby">📊 Grouping GROUP BY</string>
+    <string name="tab_orderby">🔀 Sorting ORDER BY</string>
+    <string name="tab_limit">🛑 Row Limit LIMIT</string>
+
+    <string name="overview_title">💡 Overview Guide</string>
+    <string name="overview_body">&lt;p&gt;Welcome to the &lt;b&gt;Visual Query Builder&lt;/b&gt;!&lt;/p&gt;&lt;p&gt;This panel helps you design SQL SELECT queries by choosing tables, columns, and filter conditions without writing SQL by hand.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Select main table:&lt;/b&gt; Chooses the primary table in the FROM clause.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Select columns:&lt;/b&gt; Check columns to display. If you select columns from another table, foreign keys will be traced to build JOIN clauses automatically.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Filters (WHERE):&lt;/b&gt; Add constraints using the \'Add Condition\' button.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="equal_title">🎯 Equal / Not Equal Operators (=, !=)</string>
+    <string name="equal_body">&lt;p&gt;Performs exact value comparisons.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Select a column, choose &lt;code&gt;=&lt;/code&gt; (Equal) or &lt;code&gt;!=&lt;/code&gt; (Not Equal), and enter a target value.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Example:&lt;/b&gt; &lt;code&gt;status = \'Active\'&lt;/code&gt; or &lt;code&gt;role_id = 1&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;i&gt;Note:&lt;/i&gt; Text values will automatically be enclosed in single quotes.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="comparison_title">⚡ Comparison Operators (&gt;, &lt;, &gt;=, &lt;=)</string>
+    <string name="comparison_body">&lt;p&gt;Compares ranges of values, typically for numbers or date/time types.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Example:&lt;/b&gt; &lt;code&gt;price &gt; 500&lt;/code&gt; or &lt;code&gt;created_at &gt;= \'2026-01-01\'&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;Useful for finding high-value orders, recently registered users, etc.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="like_title">🔍 LIKE Operator (Pattern Matching)</string>
+    <string name="like_body">&lt;p&gt;Finds strings matching a specific pattern (case-sensitivity depends on DB engine).&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Use &lt;code&gt;%&lt;/code&gt; wildcard for any string of zero or more characters, or &lt;code&gt;_&lt;/code&gt; for a single character.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Examples:&lt;/b&gt;&lt;ul&gt;&lt;li&gt;Enter &lt;code&gt;%An%&lt;/code&gt; to find names containing \'An\'.&lt;/li&gt;&lt;li&gt;Enter &lt;code&gt;An%&lt;/code&gt; to find names starting with \'An\'.&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="between_title">📅 BETWEEN Operator (Range Check)</string>
+    <string name="between_body">&lt;p&gt;Filters values within an inclusive range.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Enter two values separated by &lt;code&gt;AND&lt;/code&gt; or a comma &lt;code&gt;,&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Examples:&lt;/b&gt;&lt;ul&gt;&lt;li&gt;Enter &lt;code&gt;10 AND 100&lt;/code&gt; → translates to: &lt;code&gt;col BETWEEN 10 AND 100&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Enter &lt;code&gt;2026-01-01 AND 2026-05-31&lt;/code&gt; → translates to: &lt;code&gt;col BETWEEN \'2026-01-01\' AND \'2026-05-31\'&lt;/code&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="in_title">📦 IN Operator (Set Inclusion)</string>
+    <string name="in_body">&lt;p&gt;Checks if a column value matches any item in a list.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Enter values separated by commas &lt;code&gt;,&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Example:&lt;/b&gt; Enter &lt;code&gt;Active, Pending&lt;/code&gt; → translates to: &lt;code&gt;status IN (\'Active\', \'Pending\')&lt;/code&gt;.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="null_title">⭕ IS NULL / IS NOT NULL Operators</string>
+    <string name="null_body">&lt;p&gt;Checks if a field is empty (NULL) or populated.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Example:&lt;/b&gt; &lt;code&gt;email IS NULL&lt;/code&gt; finds users without email addresses.&lt;/li&gt;&lt;li&gt;&lt;i&gt;Note:&lt;/i&gt; Choosing this operator hides the value input field automatically.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="exists_title">🧩 EXISTS / NOT EXISTS Operators</string>
+    <string name="exists_body">&lt;p&gt;Checks if a subquery returns any rows.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Select &lt;code&gt;EXISTS&lt;/code&gt; or &lt;code&gt;NOT EXISTS&lt;/code&gt;, and enter the full subquery text.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Subquery Example:&lt;/b&gt; &lt;code&gt;SELECT 1 FROM orders WHERE orders.user_id = users.id&lt;/code&gt;&lt;/li&gt;&lt;li&gt;&lt;b&gt;Resulting SQL:&lt;/b&gt; &lt;code&gt;EXISTS (SELECT 1 FROM orders WHERE orders.user_id = users.id)&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Useful for checking related existence, such as users with orders vs users without orders.&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="groupby_title">📊 GROUP BY Gom nhóm</string>
+    <string name="groupby_body">&lt;p&gt;Groups rows sharing identical values. Often used alongside aggregate functions like SUM, COUNT, AVG, MIN, MAX.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Right-click columns in the order dialog to apply an aggregate (e.g. COUNT), then add the grouping column under \'GROUP BY\'.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Example:&lt;/b&gt; Counting customers by city:&lt;ul&gt;&lt;li&gt;Select columns: &lt;code&gt;city&lt;/code&gt; and &lt;code&gt;COUNT(id)&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Add Group By row: choose &lt;code&gt;city&lt;/code&gt;&lt;/li&gt;&lt;li&gt;Resulting SQL: &lt;code&gt;SELECT city, COUNT(id) FROM users GROUP BY city&lt;/code&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="orderby_title">🔀 ORDER BY Sắp xếp</string>
+    <string name="orderby_body">&lt;p&gt;Sorts results in ascending (ASC) or descending (DESC) order.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Click \'Add Sort\', pick a column, and choose direction.&lt;/li&gt;&lt;li&gt;You can sort by multiple columns (e.g., date descending, then name ascending).&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="limit_title">🛑 Row Limit (LIMIT / TOP)</string>
+    <string name="limit_body">&lt;p&gt;Restricts the maximum number of rows returned.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Importance:&lt;/b&gt; In large datasets, loading all records can crash the app or exhaust memory. Adding a limit (e.g. 100) ensures snappy responses.&lt;/li&gt;&lt;li&gt;&lt;b&gt;How to use:&lt;/b&gt; Enter a number in the &lt;b&gt;\'Row Limit:\'&lt;/b&gt; box. Leave blank for no limit.&lt;/li&gt;&lt;li&gt;Automatically mapped to &lt;code&gt;LIMIT N&lt;/code&gt; or &lt;code&gt;TOP N&lt;/code&gt; syntax matching your DB dialet.&lt;/li&gt;&lt;/ul&gt;</string>
+</resources>

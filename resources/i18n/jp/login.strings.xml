@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="window_title">SQLBot Desktop - ログイン</string>
+    <string name="remember_username">ユーザー名を記憶する</string>
+    <string name="btn_connect">接続</string>
+    <string name="btn_manage_connections">接続管理</string>
+    <string name="headline">自然言語でデータベースをクエリ、ローカルAI実行。</string>
+    <string name="summary">IT管理のデータベース構成にログインし、解釈されたスキーマを使用して自然言語からSQL SELECTを生成します。</string>
+    <string name="feature_ai_title">ローカルAI</string>
+    <string name="feature_ai_detail">CPU上でGGUF</string>
+    <string name="feature_safety_title">安全</string>
+    <string name="feature_safety_detail">SELECT文のみ実行</string>
+    <string name="feature_db_title">DB</string>
+    <string name="feature_db_detail">MySQLおよびPostgreSQL</string>
+    <string name="feature_context_title">文脈あり</string>
+    <string name="feature_context_detail">スキーマ注釈の追加</string>
+    <string name="eyebrow">データベース ログイン</string>
+    <string name="select_connection">接続の選択</string>
+    <string name="caption">割り当てられたSQLアカウントを使用してセッションを開きます。</string>
+    <string name="label_connection">接続プロファイル</string>
+    <string name="label_username">ユーザー名</string>
+    <string name="placeholder_username">SQLユーザー名を入力</string>
+    <string name="label_password">パスワード</string>
+    <string name="placeholder_password">パスワードを入力</string>
+    <string name="hint_manage_connections">接続管理にはITパスワードが必要です。</string>
+    <string name="status_ready">接続準備完了。</string>
+    <string name="status_no_profiles">接続プロファイルがありません。接続管理を開いて作成してください。</string>
+    <string name="status_invalid_profile">有効な接続プロファイルを選択してください。</string>
+    <string name="status_credentials_required">ユーザー名とパスワードの両方を入力してください。</string>
+    <string name="status_connecting">{profile_name} に接続中...</string>
+    <string name="status_connected">{profile_name} に接続されました</string>
+</resources>

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import csv
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QIcon
+from PySide6.QtCore import Qt, Signal, QSettings
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QActionGroup
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -53,6 +53,8 @@ class PromptEdit(QTextEdit):
             super().keyPressEvent(event)
 
 
+from sqlbot_desktop.utils.i18n_manager import tr
+
 class MainWindow(QMainWindow):
     """Primary SQLBot workspace matching Module 2.1."""
 
@@ -73,6 +75,7 @@ class MainWindow(QMainWindow):
     schema_assistant_requested = Signal()
     show_results_requested = Signal()
     clear_chat_requested = Signal()
+    language_changed = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -118,34 +121,189 @@ class MainWindow(QMainWindow):
         self._build_schema_dock()
         self._build_status_bar()
         self._load_placeholder_content()
+        self.retranslate_ui()
+        self.clear_chat()
 
     def set_connection(self, profile: ConnectionProfile) -> None:
-        self.connection_label.setText(f"DB: {profile.name}")
+        self._current_profile = profile
+        self.connection_label.setText(f"{tr('main.status_db_connected_prefix', 'DB: ')}{profile.name}")
         self.connection_label.setToolTip(f"Connected: {profile.driver} | {profile.database or profile.extra}")
 
     def _build_menu(self) -> None:
         self.menu_bar = QMenuBar(self)
-        file_menu = self.menu_bar.addMenu("File")
-        export_action = file_menu.addAction("Export CSV")
-        export_action.triggered.connect(lambda checked=False: self.export_results_csv())
-        file_menu.addSeparator()
-        file_menu.addAction("Exit", self.close)
+        self.file_menu = self.menu_bar.addMenu("")
+        self.export_action = self.file_menu.addAction("")
+        self.export_action.triggered.connect(lambda checked=False: self.export_results_csv())
+        self.file_menu.addSeparator()
+        self.exit_action = self.file_menu.addAction("", self.close)
 
-        self.view_menu = self.menu_bar.addMenu("View")
-        history_action = self.view_menu.addAction("History")
-        bookmarks_action = self.view_menu.addAction("Bookmarks")
-        schema_action = self.view_menu.addAction("Schema")
-        history_action.triggered.connect(lambda checked=False: self.history_requested.emit())
-        bookmarks_action.triggered.connect(lambda checked=False: self.bookmarks_requested.emit())
-        schema_action.triggered.connect(lambda checked=False: self.show_schema_viewer())
-        schema_action.triggered.connect(lambda checked=False: self.schema_requested.emit())
+        self.view_menu = self.menu_bar.addMenu("")
+        self.history_action = self.view_menu.addAction("")
+        self.bookmarks_action = self.view_menu.addAction("")
+        self.schema_action = self.view_menu.addAction("")
+        self.history_action.triggered.connect(lambda checked=False: self.history_requested.emit())
+        self.bookmarks_action.triggered.connect(lambda checked=False: self.bookmarks_requested.emit())
+        self.schema_action.triggered.connect(lambda checked=False: self.show_schema_viewer())
+        self.schema_action.triggered.connect(lambda checked=False: self.schema_requested.emit())
 
-        self.tools_menu = self.menu_bar.addMenu("Tools")
-        settings_action = self.tools_menu.addAction("Settings")
-        refresh_samples_action = self.tools_menu.addAction("Refresh Sample Values")
-        settings_action.triggered.connect(lambda checked=False: self.settings_requested.emit())
-        refresh_samples_action.triggered.connect(lambda checked=False: self.refresh_samples_requested.emit())
+        self.view_menu.addSeparator()
+        self.theme_menu = self.view_menu.addMenu("")
+        self.light_action = self.theme_menu.addAction("")
+        self.light_action.setCheckable(True)
+        self.dark_action = self.theme_menu.addAction("")
+        self.dark_action.setCheckable(True)
+
+        self.theme_group = QActionGroup(self)
+        self.theme_group.addAction(self.light_action)
+        self.theme_group.addAction(self.dark_action)
+        self.theme_group.setExclusive(True)
+
+        settings = QSettings("SQLBot", "SQLBotDesktop")
+        current_theme = settings.value("theme", "light")
+        if current_theme == "dark":
+            self.dark_action.setChecked(True)
+        else:
+            self.light_action.setChecked(True)
+
+        self.light_action.triggered.connect(lambda: self._change_theme("light"))
+        self.dark_action.triggered.connect(lambda: self._change_theme("dark"))
+
+        self.tools_menu = self.menu_bar.addMenu("")
+        self.settings_action = self.tools_menu.addAction("")
+        self.refresh_samples_action = self.tools_menu.addAction("")
+        self.settings_action.triggered.connect(lambda checked=False: self.settings_requested.emit())
+        self.refresh_samples_action.triggered.connect(lambda checked=False: self.refresh_samples_requested.emit())
+
+        # Language selection menu under Tools
+        self.language_menu = QMenu("", self)
+        self.lang_vi_action = self.language_menu.addAction("🇻🇳 Tiếng Việt (VI)")
+        self.lang_vi_action.setCheckable(True)
+        self.lang_en_action = self.language_menu.addAction("🇺🇸 English (EN)")
+        self.lang_en_action.setCheckable(True)
+        self.lang_jp_action = self.language_menu.addAction("🇯🇵 日本語 (JP)")
+        self.lang_jp_action.setCheckable(True)
+
+        self.lang_group = QActionGroup(self)
+        self.lang_group.addAction(self.lang_vi_action)
+        self.lang_group.addAction(self.lang_en_action)
+        self.lang_group.addAction(self.lang_jp_action)
+        self.lang_group.setExclusive(True)
+
+        self.tools_menu.addMenu(self.language_menu)
+
+        current_lang = settings.value("language", "vi")
+        if current_lang == "en":
+            self.lang_en_action.setChecked(True)
+        elif current_lang == "jp":
+            self.lang_jp_action.setChecked(True)
+        else:
+            self.lang_vi_action.setChecked(True)
+
+        self.lang_vi_action.triggered.connect(lambda: self.language_changed.emit("vi"))
+        self.lang_en_action.triggered.connect(lambda: self.language_changed.emit("en"))
+        self.lang_jp_action.triggered.connect(lambda: self.language_changed.emit("jp"))
+
         self.setMenuBar(self.menu_bar)
+
+    def _change_theme(self, theme: str) -> None:
+        from sqlbot_desktop.views.theme import load_stylesheet
+        from PySide6.QtWidgets import QApplication
+
+        settings = QSettings("SQLBot", "SQLBotDesktop")
+        settings.setValue("theme", theme)
+
+        # Apply stylesheet to whole application
+        QApplication.instance().setStyleSheet(load_stylesheet(theme))
+
+        # Ensure correct menu checked states
+        if theme == "dark":
+            self.dark_action.setChecked(True)
+        else:
+            self.light_action.setChecked(True)
+
+    def retranslate_ui(self) -> None:
+        # Title & Subtitle
+        self.setWindowTitle(tr("main.app_title"))
+        self.title_label.setText(tr("main.app_title"))
+        self.subtitle_label.setText(tr("main.app_subtitle"))
+
+        # Mode button
+        current_idx = self.workspace_stack.currentIndex()
+        if current_idx == 0:
+            self.mode_switch_btn.setText(tr("main.btn_mode_vqb"))
+        else:
+            self.mode_switch_btn.setText(tr("main.btn_mode_chat"))
+
+        # Menu bar titles
+        self.file_menu.setTitle(tr("main.menu_file"))
+        self.export_action.setText(tr("main.menu_export_csv"))
+        self.exit_action.setText(tr("main.menu_exit"))
+
+        self.view_menu.setTitle(tr("main.menu_view"))
+        self.history_action.setText(tr("main.menu_history"))
+        self.bookmarks_action.setText(tr("main.menu_bookmarks"))
+        self.schema_action.setText(tr("main.menu_schema"))
+        self.theme_menu.setTitle(tr("main.menu_theme"))
+        self.light_action.setText(tr("main.menu_theme_light"))
+        self.dark_action.setText(tr("main.menu_theme_dark"))
+
+        self.tools_menu.setTitle(tr("main.menu_tools"))
+        self.settings_action.setText(tr("main.menu_settings"))
+        self.refresh_samples_action.setText(tr("main.menu_refresh_samples"))
+        self.language_menu.setTitle(tr("main.menu_language"))
+
+        # Workspace widgets
+        if hasattr(self, "schema_dock_widget") and self.schema_dock_widget:
+            self.schema_dock_widget.setWindowTitle(tr("main.schema_viewer_title"))
+        if hasattr(self, "schema_dock_title_label") and self.schema_dock_title_label:
+            self.schema_dock_title_label.setText(tr("main.schema_viewer_title"))
+        if hasattr(self, "schema_dock_float_button") and self.schema_dock_float_button:
+            self.schema_dock_float_button.setToolTip(tr("main.schema_dock_float", "Float / dock schema viewer"))
+        if hasattr(self, "schema_dock_close_button") and self.schema_dock_close_button:
+            self.schema_dock_close_button.setToolTip(tr("main.schema_dock_close", "Close schema viewer"))
+        if hasattr(self, "schema_viewer_title") and self.schema_viewer_title:
+            self.schema_viewer_title.setText(tr("main.schema_viewer_title"))
+
+        self.cancel_button.setText(tr("main.btn_cancel"))
+        self.prompt_label.setText(tr("main.prompt_label"))
+        self.question_input.setPlaceholderText(tr("main.prompt_input_placeholder"))
+        self.send_button.setText(tr("main.chat_btn_send"))
+        self.stop_button.setText(tr("main.btn_stop"))
+
+        self.sql_label.setText(tr("main.sql_label"))
+        self.sql_editor.setPlaceholderText(tr("main.sql_editor_placeholder"))
+        self.execute_button.setText(tr("main.btn_execute"))
+        self.show_results_button.setText(tr("main.btn_results"))
+        self.paste_button.setText(tr("main.btn_paste_sql"))
+        self.bookmark_button.setText(tr("main.btn_bookmark"))
+
+        self.chat_label.setText(tr("main.chat_label"))
+        self.clear_button.setText(tr("main.btn_clear_chat"))
+
+        # Retranslate visual query builder
+        if hasattr(self, "visual_builder") and self.visual_builder:
+            self.visual_builder.retranslate_ui()
+
+        # Update connections and schemas
+        if hasattr(self, "_current_profile") and self._current_profile:
+            self.set_connection(self._current_profile)
+        else:
+            self.connection_label.setText(tr("main.status_db_disconnected"))
+
+        # Schema status
+        if hasattr(self, "_tables") and self._tables:
+            table_count = len(self._tables)
+            column_count = sum(len(table.columns) for table in self._tables)
+            self.schema_summary_label.setText(f"{table_count} tables, {column_count} columns")
+        else:
+            self.schema_summary_label.setText(tr("main.schema_summary_label"))
+
+        # AI Status
+        current_status_text = self.model_status_label.text()
+        if not current_status_text or current_status_text in ("AI chưa load", "AI not loaded", "AI未ロード"):
+            self.model_status_label.setText(tr("main.status_db_no_load"))
+        elif current_status_text in ("AI đã load", "AI loaded", "AIロード済み"):
+            self.model_status_label.setText(tr("main.status_db_loaded"))
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -172,6 +330,7 @@ class MainWindow(QMainWindow):
         self.workspace_stack = QStackedWidget()
         self.workspace_stack.addWidget(chat_page)
         self.workspace_stack.addWidget(self.visual_builder)
+        self.workspace_stack.setCurrentIndex(1)
         root_layout.addWidget(self.workspace_stack, 1)
 
         self.setCentralWidget(root)
@@ -181,15 +340,15 @@ class MainWindow(QMainWindow):
         header.setSpacing(10)
 
         title_group = QVBoxLayout()
-        title = QLabel("SQLBot Workspace")
-        title.setObjectName("mainTitle")
-        subtitle = QLabel("Tạo, kiểm tra và thực thi SQL SELECT từ câu hỏi tiếng Việt.")
-        subtitle.setObjectName("mainSubtitle")
-        title_group.addWidget(title)
-        title_group.addWidget(subtitle)
+        self.title_label = QLabel("SQLBot Workspace")
+        self.title_label.setObjectName("mainTitle")
+        self.subtitle_label = QLabel()
+        self.subtitle_label.setObjectName("mainSubtitle")
+        title_group.addWidget(self.title_label)
+        title_group.addWidget(self.subtitle_label)
 
         # Mode switch button on the far right of the header
-        self.mode_switch_btn = QPushButton("Tự Build Query 🛠️")
+        self.mode_switch_btn = QPushButton()
         self.mode_switch_btn.clicked.connect(self._toggle_workspace_mode)
         self.mode_switch_btn.setMinimumHeight(38)
         self.mode_switch_btn.setStyleSheet("""
@@ -212,9 +371,10 @@ class MainWindow(QMainWindow):
         return header
 
     def _build_schema_dock(self) -> None:
-        dock = QDockWidget("Schema Viewer", self)
-        dock.setObjectName("schemaDock")
-        dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.schema_dock_widget = QDockWidget("", self)
+        self.schema_dock_widget.setObjectName("schemaDock")
+        self.schema_dock_widget.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.schema_dock_widget.setTitleBarWidget(self._build_schema_dock_title_bar())
 
         content = QWidget()
         content.setObjectName("schemaViewerPanel")
@@ -222,21 +382,49 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(14, 12, 14, 14)
         layout.setSpacing(10)
 
-        title = QLabel("Schema Viewer")
-        title.setObjectName("sectionTitle")
+        self.schema_viewer_title = QLabel()
+        self.schema_viewer_title.setObjectName("sectionTitle")
         self.schema_summary_label.setObjectName("formHint")
         self.schema_summary_label.setWordWrap(True)
 
-        layout.addWidget(title)
+        layout.addWidget(self.schema_viewer_title)
         layout.addWidget(self.schema_summary_label)
         layout.addWidget(self.schema_tree, 1)
 
-        dock.setWidget(content)
-        dock.hide()
-        self.schema_dock = dock
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        self.schema_dock_widget.setWidget(content)
+        self.schema_dock_widget.hide()
+        self.schema_dock = self.schema_dock_widget
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.schema_dock_widget)
 
+    def _build_schema_dock_title_bar(self) -> QWidget:
+        title_bar = QWidget()
+        title_bar.setObjectName("schemaDockTitleBar")
+        layout = QHBoxLayout(title_bar)
+        layout.setContentsMargins(10, 4, 6, 4)
+        layout.setSpacing(6)
 
+        self.schema_dock_title_label = QLabel()
+        self.schema_dock_title_label.setObjectName("schemaDockTitle")
+
+        self.schema_dock_float_button = QToolButton()
+        self.schema_dock_float_button.setObjectName("schemaDockFloatButton")
+        self.schema_dock_float_button.setText("□")
+        self.schema_dock_float_button.setFixedSize(26, 24)
+        self.schema_dock_float_button.clicked.connect(self._toggle_schema_dock_floating)
+
+        self.schema_dock_close_button = QToolButton()
+        self.schema_dock_close_button.setObjectName("schemaDockCloseButton")
+        self.schema_dock_close_button.setText("X")
+        self.schema_dock_close_button.setFixedSize(26, 24)
+        self.schema_dock_close_button.clicked.connect(self.schema_dock_widget.hide)
+
+        layout.addWidget(self.schema_dock_title_label, 1)
+        layout.addWidget(self.schema_dock_float_button)
+        layout.addWidget(self.schema_dock_close_button)
+        return title_bar
+
+    def _toggle_schema_dock_floating(self) -> None:
+        self.schema_dock_widget.setFloating(not self.schema_dock_widget.isFloating())
 
     def _build_busy_panel(self) -> QFrame:
         self.busy_panel.setObjectName("busyPanel")
@@ -258,7 +446,7 @@ class MainWindow(QMainWindow):
         self.busy_progress.setTextVisible(False)
         self.busy_progress.setFixedWidth(260)
 
-        self.cancel_button = QPushButton("Hủy")
+        self.cancel_button = QPushButton()
         self.cancel_button.setObjectName("dangerButton")
         self.cancel_button.setFixedWidth(80)
         self.cancel_button.clicked.connect(self.cancel_requested.emit)
@@ -279,12 +467,11 @@ class MainWindow(QMainWindow):
         prompt_column = QVBoxLayout()
         prompt_column.setSpacing(10)
 
-        prompt_label = QLabel("Nhập câu hỏi / Yêu cầu")
-        prompt_label.setObjectName("sectionTitle")
+        self.prompt_label = QLabel()
+        self.prompt_label.setObjectName("sectionTitle")
 
         self.question_input.setObjectName("questionInput")
-        self.question_input.setPlaceholderText("Hỏi trợ lý hoặc nhập câu hỏi (ví dụ: 'Tìm người dùng tên Tú'...)")
-        self.question_input.setAccessibleName("Nhập yêu cầu bằng tiếng Việt")
+        self.question_input.setAccessibleName("Nhập yêu cầu")
         self.question_input.setFixedHeight(160)
         self.question_input.returnPressed.connect(self._on_send_clicked)
 
@@ -292,17 +479,17 @@ class MainWindow(QMainWindow):
         self.send_button.setObjectName("primaryButton")
         self.send_button.setMinimumHeight(38)
         self.send_button.clicked.connect(self._on_send_clicked)
-        
+
         self.stop_button.setObjectName("dangerButton")
         self.stop_button.setMinimumHeight(38)
         self.stop_button.setVisible(False)
         self.stop_button.clicked.connect(self.cancel_requested.emit)
-        
+
         prompt_actions.addWidget(self.send_button)
         prompt_actions.addWidget(self.stop_button)
         prompt_actions.addStretch()
 
-        prompt_column.addWidget(prompt_label)
+        prompt_column.addWidget(self.prompt_label)
         prompt_column.addWidget(self.question_input)
         prompt_column.addLayout(prompt_actions)
 
@@ -310,36 +497,35 @@ class MainWindow(QMainWindow):
         sql_column = QVBoxLayout()
         sql_column.setSpacing(10)
 
-        sql_label = QLabel("SQL Editor (Câu lệnh SELECT)")
-        sql_label.setObjectName("sectionTitle")
+        self.sql_label = QLabel()
+        self.sql_label.setObjectName("sectionTitle")
 
         self.sql_editor.setObjectName("sqlEditor")
-        self.sql_editor.setPlaceholderText("Câu lệnh SQL sẽ hiển thị hoặc chỉnh sửa tại đây...")
         self.sql_editor.setAccessibleName("SQL Editor")
         self.sql_editor.setFont(QFont("Courier New", 11))
         self.sql_editor.setFixedHeight(160)
 
         sql_actions = QHBoxLayout()
-        execute_button = QPushButton("Execute (Chạy)")
-        execute_button.setObjectName("successButton")
-        show_results_button = QPushButton("Xem kết quả")
-        show_results_button.setObjectName("secondaryButton")
-        paste_button = QPushButton("Paste SQL")
-        paste_button.setObjectName("secondaryButton")
-        bookmark_button = QPushButton("Bookmark")
-        bookmark_button.setObjectName("warningButton")
+        self.execute_button = QPushButton()
+        self.execute_button.setObjectName("successButton")
+        self.show_results_button = QPushButton()
+        self.show_results_button.setObjectName("secondaryButton")
+        self.paste_button = QPushButton()
+        self.paste_button.setObjectName("secondaryButton")
+        self.bookmark_button = QPushButton()
+        self.bookmark_button.setObjectName("warningButton")
 
-        execute_button.clicked.connect(self.execute_requested.emit)
-        show_results_button.clicked.connect(self.show_results_requested.emit)
-        paste_button.clicked.connect(self.sql_editor.paste)
-        bookmark_button.clicked.connect(self.bookmark_requested.emit)
+        self.execute_button.clicked.connect(self.execute_requested.emit)
+        self.show_results_button.clicked.connect(self.show_results_requested.emit)
+        self.paste_button.clicked.connect(self.sql_editor.paste)
+        self.bookmark_button.clicked.connect(self.bookmark_requested.emit)
 
-        for button in [execute_button, show_results_button, paste_button, bookmark_button]:
+        for button in [self.execute_button, self.show_results_button, self.paste_button, self.bookmark_button]:
             button.setMinimumHeight(38)
             sql_actions.addWidget(button)
         sql_actions.addStretch()
 
-        sql_column.addWidget(sql_label)
+        sql_column.addWidget(self.sql_label)
         sql_column.addWidget(self.sql_editor)
         sql_column.addLayout(sql_actions)
 
@@ -355,17 +541,17 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
 
         header_layout = QHBoxLayout()
-        chat_label = QLabel("Trợ lý CSDL & Tạo truy vấn")
-        chat_label.setObjectName("sectionTitle")
+        self.chat_label = QLabel()
+        self.chat_label.setObjectName("sectionTitle")
 
-        clear_button = QPushButton("Xóa lịch sử")
-        clear_button.setObjectName("secondaryButton")
-        clear_button.setFixedWidth(110)
-        clear_button.clicked.connect(self.clear_chat_requested.emit)
+        self.clear_button = QPushButton()
+        self.clear_button.setObjectName("secondaryButton")
+        self.clear_button.setFixedWidth(110)
+        self.clear_button.clicked.connect(self.clear_chat_requested.emit)
 
-        header_layout.addWidget(chat_label)
+        header_layout.addWidget(self.chat_label)
         header_layout.addStretch()
-        header_layout.addWidget(clear_button)
+        header_layout.addWidget(self.clear_button)
 
         self.chat_view.setObjectName("chatView")
         self.chat_view.setUndoRedoEnabled(False)
@@ -391,11 +577,11 @@ class MainWindow(QMainWindow):
             return
         self.generate_requested.emit(text)
 
-    def set_schema(self, tables: list[TableInfo], annotations: dict[str, object] | None = None) -> None:
+    def set_schema(self, tables: list[TableInfo], annotations: dict[str, object] | None = None, dialect: str = "sqlite") -> None:
         self._tables = tables
         self._annotations = annotations or {}
         self.schema_tree.set_schema(tables, annotations)
-        self.visual_builder.set_schema(tables, annotations)
+        self.visual_builder.set_schema(tables, annotations, dialect)
         table_count = len(tables)
         column_count = sum(len(table.columns) for table in tables)
         self.schema_summary_label.setText(f"{table_count} tables, {column_count} columns")
@@ -424,6 +610,11 @@ class MainWindow(QMainWindow):
         self._ai_config = config
 
     def set_model_status(self, message: str, loaded: bool = False) -> None:
+        # Match/translate status message if static strings
+        if message in ("AI chưa load", "AI not loaded", "AI未ロード"):
+            message = tr("main.status_db_no_load")
+        elif message in ("AI đã load", "AI loaded", "AIロード済み"):
+            message = tr("main.status_db_loaded")
         self.model_status_label.setText(message)
         self.model_status_label.setProperty("loaded", loaded)
         self.model_status_label.style().unpolish(self.model_status_label)
@@ -479,7 +670,7 @@ class MainWindow(QMainWindow):
             f"<div style='margin: 6px 0; text-align: right;'>"
             f"  <div style='display: inline-block; background-color: #dbeafe; color: #0f243f; "
             f"              padding: 8px 12px; border-radius: 10px; max-width: 85%; text-align: left;'>"
-            f"    <b>Bạn:</b><br/>{text}"
+            f"    <b>{tr('main.user_role_prefix')}</b><br/>{text}"
             f"  </div>"
             f"</div>"
         )
@@ -492,7 +683,7 @@ class MainWindow(QMainWindow):
             f"<div style='margin: 6px 0; text-align: left;'>"
             f"  <div style='display: inline-block; background-color: #ffffff; color: #182230; "
             f"              border: 1px solid #d9e1ec; padding: 8px 12px; border-radius: 10px; max-width: 85%;'>"
-            f"    <b style='color: #135ba1;'>Trợ lý CSDL:</b><br/>{formatted_text}"
+            f"    <b style='color: #135ba1;'>{tr('main.assistant_role_prefix')}</b><br/>{formatted_text}"
             f"  </div>"
             f"</div>"
         )
@@ -520,9 +711,7 @@ class MainWindow(QMainWindow):
         welcome = (
             f"<div style='background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; "
             f"            padding: 10px; border-radius: 8px; margin-bottom: 8px;'>"
-            f"  <b>Xin chào!</b> Tôi là trợ lý CSDL.<br/>"
-            f"  Hãy hỏi tôi bất kỳ điều gì về cấu trúc bảng hoặc yêu cầu tạo truy vấn bằng tiếng Việt.<br/>"
-            f"  <i>(Ví dụ: 'Tìm tất cả tasks của Tú từ ngày 01/05/2026')</i>"
+            f"  <b>{tr('main.welcome_assistant_title')}</b> {tr('main.welcome_assistant_body')}"
             f"</div>"
         )
         self.chat_view.setHtml(welcome)
@@ -545,8 +734,8 @@ class MainWindow(QMainWindow):
 
         answer = QMessageBox.question(
             self,
-            "Thoát SQLBot",
-            "Tắt ứng dụng sẽ unload AI model đang chạy. Bạn muốn thoát?",
+            tr("main.dialog_exit_title"),
+            tr("main.dialog_exit_message"),
         )
         if answer != QMessageBox.StandardButton.Yes:
             event.ignore()
@@ -561,7 +750,7 @@ class MainWindow(QMainWindow):
         current_idx = self.workspace_stack.currentIndex()
         if current_idx == 0:
             self.workspace_stack.setCurrentIndex(1)
-            self.mode_switch_btn.setText("Trò chuyện AI 💬")
+            self.mode_switch_btn.setText(tr("main.btn_mode_chat"))
         else:
             self.workspace_stack.setCurrentIndex(0)
-            self.mode_switch_btn.setText("Tự Build Query 🛠️")
+            self.mode_switch_btn.setText(tr("main.btn_mode_vqb"))

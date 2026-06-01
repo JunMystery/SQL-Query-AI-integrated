@@ -67,11 +67,20 @@ class TestJoinPlanner(unittest.TestCase):
 
         # Verify join clauses:
         # 1. users -> orders join should be LEFT because user_id in orders is nullable=True
-        # 2. orders -> payments join should be INNER because order_id in payments is nullable=False
+        # 2. orders -> payments join should be LEFT because payments is child of orders (Cha -> Con)
         clauses = plan["join_clauses"]
         self.assertEqual(len(clauses), 2)
         self.assertIn("LEFT JOIN orders o ON u.id = o.user_id", clauses)
-        self.assertIn("INNER JOIN payments p ON o.id = p.order_id", clauses)
+        self.assertIn("LEFT JOIN payments p ON o.id = p.order_id", clauses)
+
+    def test_plan_joins_con_to_cha(self) -> None:
+        # Join payments -> orders -> users
+        plan = self.planner.plan_joins("payments", ["users"])
+        clauses = plan["join_clauses"]
+        # Verify: payments -> orders is Con -> Cha and not nullable, so INNER JOIN
+        # orders -> users is Con -> Cha and nullable, so LEFT JOIN
+        self.assertIn("INNER JOIN orders o ON p.order_id = o.id", clauses)
+        self.assertIn("LEFT JOIN users u ON o.user_id = u.id", clauses)
 
     def test_plan_joins_override(self) -> None:
         # Override to force INNER JOIN on orders

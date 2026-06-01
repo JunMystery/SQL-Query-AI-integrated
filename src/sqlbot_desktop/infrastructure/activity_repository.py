@@ -85,6 +85,17 @@ class ActivityRepository:
                 (question, sql, category, notes),
             )
 
+    def update_bookmark(self, bookmark_id: int, question: str, sql: str, category: str = "", notes: str = "") -> None:
+        with self._connection() as connection:
+            connection.execute(
+                """
+                UPDATE bookmarks
+                SET question = ?, sql = ?, category = ?, notes = ?
+                WHERE id = ?
+                """,
+                (question, sql, category, notes, bookmark_id),
+            )
+
     def list_bookmarks(self) -> list[BookmarkEntry]:
         with self._connection() as connection:
             rows = connection.execute(

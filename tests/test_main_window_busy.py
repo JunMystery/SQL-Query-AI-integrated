@@ -25,6 +25,7 @@ class MainWindowBusyTests(unittest.TestCase):
 
     def test_busy_state_replaces_send_button_with_stop_button(self) -> None:
         window = MainWindow()
+        window._toggle_workspace_mode()
 
         self.assertTrue(window.send_button.isVisibleTo(window))
         self.assertFalse(window.stop_button.isVisibleTo(window))
@@ -57,6 +58,18 @@ class MainWindowBusyTests(unittest.TestCase):
         window.set_ai_model_config(AIModelConfig(backend=AIBackend.API, self_correction_retries=5))
 
         self.assertEqual(window.ai_model_config().self_correction_retries, 5)
+
+    def test_visual_query_builder_is_default_workspace_after_login(self) -> None:
+        window = MainWindow()
+        initial_mode_text = window.mode_switch_btn.text()
+
+        self.assertEqual(window.workspace_stack.currentWidget(), window.visual_builder)
+        self.assertTrue(initial_mode_text)
+
+        window._toggle_workspace_mode()
+
+        self.assertNotEqual(window.workspace_stack.currentWidget(), window.visual_builder)
+        self.assertNotEqual(window.mode_switch_btn.text(), initial_mode_text)
 
 
 if __name__ == "__main__":

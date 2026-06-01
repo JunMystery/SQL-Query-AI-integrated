@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_table">Chọn Bảng (Table)</string>
+    <string name="group_columns">Chọn Cột (Columns)</string>
+    <string name="search_columns_placeholder">Tìm kiếm cột...</string>
+    <string name="btn_selected_only">Đã chọn 👁️</string>
+    <string name="btn_columns_order">Thứ tự cột ⇅</string>
+    <string name="btn_columns_order_short">Thứ tự</string>
+    <string name="checkbox_distinct">Loại bỏ trùng lặp</string>
+    <string name="label_limit">Giới hạn dòng:</string>
+    <string name="limit_placeholder">Không giới hạn</string>
+    <string name="group_where">Điều kiện lọc (WHERE)</string>
+    <string name="btn_add_condition">Thêm điều kiện ➕</string>
+    <string name="btn_guide">Hướng dẫn 📖</string>
+    <string name="group_groupby">Gom nhóm (GROUP BY)</string>
+    <string name="btn_add_groupby">Thêm gom nhóm ➕</string>
+    <string name="group_orderby">Sắp xếp kết quả (ORDER BY)</string>
+    <string name="btn_add_orderby">Thêm sắp xếp ➕</string>
+    <string name="btn_delete">Xóa</string>
+    <string name="condition_value_placeholder">Giá trị...</string>
+    <string name="condition_value_to_placeholder">Đến giá trị...</string>
+    <string name="sort_asc">Tăng dần (ASC)</string>
+    <string name="sort_desc">Giảm dần (DESC)</string>
+    <string name="main_table_prefix">Bảng chính:</string>
+    <string name="joined_table_prefix">Bảng liên kết:</string>
+    <string name="btn_clear_selected">Bỏ chọn tất cả ❌</string>
+</resources>

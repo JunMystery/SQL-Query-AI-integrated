@@ -126,8 +126,6 @@ QWidget#schemaViewerPanel {
 QDockWidget#schemaDock {
     background: #ffffff;
     color: #182230;
-    titlebar-close-icon: none;
-    titlebar-normal-icon: none;
 }
 
 QDockWidget#schemaDock::title {
@@ -136,6 +134,61 @@ QDockWidget#schemaDock::title {
     color: #172033;
     font-weight: 800;
     padding: 7px;
+}
+
+QDockWidget#schemaDock::close-button,
+QDockWidget#schemaDock::float-button {
+    background: #ffffff;
+    border: 1px solid #8da0bb;
+    border-radius: 5px;
+    width: 18px;
+    height: 18px;
+    margin: 3px;
+}
+
+QDockWidget#schemaDock::close-button:hover,
+QDockWidget#schemaDock::float-button:hover {
+    background: #dbeafe;
+    border-color: #246bfd;
+}
+
+QDockWidget#schemaDock::close-button:pressed,
+QDockWidget#schemaDock::float-button:pressed {
+    background: #bfdbfe;
+}
+
+QWidget#schemaDockTitleBar {
+    background: #dbeafe;
+    border-bottom: 1px solid #93c5fd;
+}
+
+QLabel#schemaDockTitle {
+    color: #0f243f;
+    font-weight: 800;
+    background: transparent;
+}
+
+QToolButton#schemaDockFloatButton,
+QToolButton#schemaDockCloseButton {
+    background: #0f62fe;
+    border: 1px solid #004bd6;
+    border-radius: 5px;
+    color: #ffffff;
+    font-weight: 900;
+    padding: 0px;
+}
+
+QToolButton#schemaDockFloatButton:hover {
+    background: #004bd6;
+}
+
+QToolButton#schemaDockCloseButton {
+    background: #c9352b;
+    border-color: #a92d25;
+}
+
+QToolButton#schemaDockCloseButton:hover {
+    background: #a92d25;
 }
 
 QLabel#logoBadge {
@@ -525,4 +578,274 @@ QPushButton#dangerButton {
 
 QPushButton#dangerButton:hover {
     background: #a92d25;
+}
+
+/* Visual Query Builder Styles */
+QComboBox#vqbCombo,
+QComboBox#vqbSearchableCombo {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    padding: 2px 24px 2px 8px;
+    font-size: 12px;
+    color: #182230;
+    min-height: 26px;
+}
+QComboBox#vqbCombo:hover,
+QComboBox#vqbSearchableCombo:hover {
+    border-color: #a8b6c8;
+}
+QComboBox#vqbCombo:focus,
+QComboBox#vqbSearchableCombo:focus {
+    border: 1.5px solid #147a63;
+}
+QComboBox#vqbCombo::drop-down,
+QComboBox#vqbSearchableCombo::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 18px;
+    border-left-width: 0px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+QComboBox#vqbCombo::down-arrow,
+QComboBox#vqbSearchableCombo::down-arrow {
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #64748b;
+    margin-right: 6px;
+}
+QComboBox#vqbCombo QAbstractItemView,
+QComboBox#vqbSearchableCombo QAbstractItemView {
+    background-color: #ffffff;
+    color: #182230;
+    selection-background-color: #edf6ff;
+    selection-color: #0f243f;
+    border: 1px solid #cbd5e1;
+    outline: 0px;
+}
+QLineEdit#vqbSearchableComboLineEdit {
+    background-color: #ffffff;
+    border: none;
+    font-size: 12px;
+    color: #182230;
+    padding: 0px;
+}
+
+QCheckBox#vqbColumnCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+}
+QCheckBox#vqbColumnCheckBox::indicator:checked {
+    background: #147a63;
+    border-color: #147a63;
+    image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+}
+QLabel#vqbColumnLabel {
+    font-size: 12px;
+    color: #182230;
+}
+
+QGroupBox#vqbGroupBox {
+    font-weight: bold;
+    font-size: 13px;
+    color: #0f243f;
+    border: 1px solid #d9e1ec;
+    border-radius: 8px;
+    margin-top: 6px;
+    background-color: #ffffff;
+    padding-top: 10px;
+}
+QGroupBox#vqbGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 10px;
+    padding: 0 4px;
+}
+
+QLineEdit#vqbColSearchInput {
+    min-height: 24px;
+    max-height: 24px;
+    padding: 1px 6px;
+    font-size: 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: #ffffff;
+    color: #182230;
+}
+QLineEdit#vqbColSearchInput:focus {
+    border: 1.5px solid #147a63;
+}
+
+QPushButton#showSelectedOnlyBtn {
+    min-height: 24px;
+    max-height: 24px;
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 1px 4px;
+}
+QPushButton#showSelectedOnlyBtn:checked {
+    background-color: #147a63;
+    color: #ffffff;
+    border-color: #147a63;
+}
+
+QListWidget#vqbSortList {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 4px;
+}
+QListWidget#vqbSortList::item {
+    padding: 2px 4px;
+    border-radius: 4px;
+    background-color: #f8fbff;
+    margin-bottom: 1px;
+    border: 1px solid #d7e7fb;
+    color: #0f243f;
+    font-size: 11px;
+}
+QListWidget#vqbSortList::item:hover {
+    background-color: #edf6ff;
+    border-color: #72aee9;
+}
+QListWidget#vqbSortList::item:selected {
+    background-color: #dbeafe;
+    color: #0f243f;
+    border-color: #246bfd;
+}
+
+QCheckBox#vqbDistinctCheck {
+    font-size: 11px;
+    color: #344054;
+    font-weight: bold;
+    padding: 2px 0;
+}
+QCheckBox#vqbDistinctCheck::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+}
+QCheckBox#vqbDistinctCheck::indicator:checked {
+    background: #147a63;
+    border-color: #147a63;
+    image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+}
+
+QLineEdit#vqbValInput {
+    min-height: 24px;
+    max-height: 24px;
+    padding: 1px 4px;
+    font-size: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: #ffffff;
+    color: #182230;
+}
+QLineEdit#vqbValInput:focus {
+    border: 1.5px solid #147a63;
+}
+
+QLabel#vqbMainTableTitle {
+    font-weight: bold;
+    color: #147a63;
+    margin-top: 2px;
+    font-size: 12px;
+}
+QLabel#vqbJoinTableTitle {
+    font-weight: bold;
+    color: #135ba1;
+    margin-top: 6px;
+    font-size: 11px;
+}
+
+QListWidget#guideTabList {
+    background-color: #ffffff;
+    border: 1px solid #d9e1ec;
+    border-radius: 8px;
+    padding: 5px;
+}
+QListWidget#guideTabList::item {
+    padding: 10px;
+    border-radius: 5px;
+    font-weight: 500;
+    color: #344054;
+}
+QListWidget#guideTabList::item:selected {
+    background-color: #edf6ff;
+    color: #0f62fe;
+}
+QStackedWidget#guideStackedPages {
+    background-color: #ffffff;
+    border: 1px solid #d9e1ec;
+    border-radius: 8px;
+    padding: 15px;
+}
+QLabel#guideTitle {
+    font-size: 16px;
+    font-weight: bold;
+    color: #0f243f;
+    margin-bottom: 10px;
+}
+QLabel#guideContent {
+    font-size: 13px;
+    color: #344054;
+    line-height: 1.5;
+}
+
+QPushButton#vqbDelBtn {
+    min-height: 24px;
+    max-height: 24px;
+    padding: 1px 4px;
+    font-size: 11px;
+    border-radius: 4px;
+    background-color: #c9352b;
+    border: 1px solid #c9352b;
+    color: #ffffff;
+    font-weight: bold;
+}
+QPushButton#vqbDelBtn:hover {
+    background-color: #a92d25;
+    border-color: #a92d25;
+}
+
+QPushButton#vqbAddCondBtn,
+QPushButton#vqbGuideBtn {
+    min-height: 24px;
+    max-height: 24px;
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    background: #ffffff;
+    border: 1px solid #b9c6d8;
+    color: #135ba1;
+}
+QPushButton#vqbAddCondBtn:hover,
+QPushButton#vqbGuideBtn:hover {
+    background: #edf6ff;
+    border-color: #72aee9;
+}
+
+QLineEdit#vqbLimitInput {
+    min-height: 24px;
+    max-height: 24px;
+    padding: 1px 4px;
+    font-size: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: #ffffff;
+    color: #182230;
+}
+QLineEdit#vqbLimitInput:focus {
+    border: 1.5px solid #147a63;
+}
+QLabel#vqbLimitLabel {
+    font-size: 11px;
+    color: #475569;
 }

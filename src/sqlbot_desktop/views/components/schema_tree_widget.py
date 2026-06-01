@@ -7,6 +7,7 @@ from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
 from sqlbot_desktop.models.entities import ColumnInfo, TableInfo
+from sqlbot_desktop.utils.i18n_manager import tr
 
 
 class SchemaTreeWidget(QTreeWidget):
@@ -27,7 +28,7 @@ class SchemaTreeWidget(QTreeWidget):
         table_payloads = self._table_payloads(annotations)
 
         if not tables:
-            empty = QTreeWidgetItem(["Chưa tải schema"])
+            empty = QTreeWidgetItem([tr("settings.schema_not_loaded", "Chưa tải schema")])
             empty.setForeground(0, QColor("#697789"))
             self.addTopLevelItem(empty)
             return
@@ -55,7 +56,7 @@ class SchemaTreeWidget(QTreeWidget):
 
         db_name_item = QTreeWidgetItem([f"[{table.name}]"])
         db_name_item.setForeground(0, QColor("#697789"))
-        db_name_item.setToolTip(0, "Tên table thật trong CSDL")
+        db_name_item.setToolTip(0, tr("settings.schema_tooltip_real_table", "Tên table thật trong CSDL"))
         table_item.addChild(db_name_item)
 
         self.addTopLevelItem(table_item)
@@ -76,7 +77,7 @@ class SchemaTreeWidget(QTreeWidget):
 
         db_name_item = QTreeWidgetItem([self._column_real_name(column, payload)])
         db_name_item.setForeground(0, QColor("#697789"))
-        db_name_item.setToolTip(0, "Tên column thật trong CSDL")
+        db_name_item.setToolTip(0, tr("settings.schema_tooltip_real_column", "Tên column thật trong CSDL"))
         column_item.addChild(db_name_item)
         return column_item
 
@@ -90,7 +91,7 @@ class SchemaTreeWidget(QTreeWidget):
         if unit:
             details.append(f"unit: {unit}")
         if note:
-            details.append(f"ghi chú: {note}")
+            details.append(tr("settings.annotation_col_note", "ghi chú") + f": {note}")
         return " | ".join(details)
 
     def _column_tooltip(self, column: ColumnInfo, payload: dict[str, object]) -> str:
@@ -103,7 +104,7 @@ class SchemaTreeWidget(QTreeWidget):
         if unit:
             parts.append(f"Unit: {unit}")
         if note:
-            parts.append(f"Ghi chú: {note}")
+            parts.append(tr("settings.annotation_col_note", "Ghi chú") + f": {note}")
         return "\n".join(parts)
 
     def _table_payloads(self, annotations: dict[str, object] | None) -> dict[str, dict[str, object]]:

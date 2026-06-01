@@ -43,6 +43,18 @@ class ActivityRepositoryTests(unittest.TestCase):
 
         self.assertEqual(self.repository.list_bookmarks(), [])
 
+    def test_bookmark_can_be_updated(self) -> None:
+        self.repository.add_bookmark("question", "select 1;", "demo", "note")
+        bookmark_id = self.repository.list_bookmarks()[0].id
+
+        self.repository.update_bookmark(bookmark_id, "updated", "select 2;", "ops", "changed")
+
+        updated = self.repository.list_bookmarks()[0]
+        self.assertEqual(updated.question, "updated")
+        self.assertEqual(updated.sql, "select 2;")
+        self.assertEqual(updated.category, "ops")
+        self.assertEqual(updated.notes, "changed")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="window_title">ガイド: 条件の設定とクエリ構築</string>
+    <string name="tab_overview">💡 概要</string>
+    <string name="tab_equal">🎯 演算子 =</string>
+    <string name="tab_comparison">⚡ 演算子 &gt;, &lt;, ...</string>
+    <string name="tab_like">🔍 演算子 LIKE</string>
+    <string name="tab_between">📅 演算子 BETWEEN</string>
+    <string name="tab_in">📦 演算子 IN</string>
+    <string name="tab_null">⭕ 演算子 IS NULL</string>
+    <string name="tab_exists">🧩 演算子 EXISTS</string>
+    <string name="tab_groupby">📊 グループ化 GROUP BY</string>
+    <string name="tab_orderby">🔀 並べ替え ORDER BY</string>
+    <string name="tab_limit">🛑 行制限 LIMIT</string>
+
+    <string name="overview_title">💡 概要ガイド</string>
+    <string name="overview_body">&lt;p&gt;&lt;b&gt;ビジュアルクエリビルダー&lt;/b&gt;へようこそ！&lt;/p&gt;&lt;p&gt;手動でSQLを記述することなく、テーブル、カラム、およびフィルタ条件を選択して SQL SELECT クエリを構築できます。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;メインテーブルの選択:&lt;/b&gt; FROM句の最初のソーステーブルを設定します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;カラムの選択:&lt;/b&gt; 表示したいカラムにチェックを入れます。他のテーブルのカラムを選択した場合、自動的に外部キーの関係をトレースして JOIN 句を生成します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;抽出条件 (WHERE):&lt;/b&gt; 「条件を追加」ボタンからさらにフィルタを追加できます。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="equal_title">🎯 等価 / 不等価演算子 (=, !=)</string>
+    <string name="equal_body">&lt;p&gt;カラムの値を正確に比較します。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; カラムを選び、演算子 &lt;code&gt;=&lt;/code&gt; (等しい) または &lt;code&gt;!=&lt;/code&gt; (等しくない) を選択し、目的の値を入力します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt; &lt;code&gt;status = \'Active\'&lt;/code&gt; または &lt;code&gt;role_id = 1&lt;/code&gt;。&lt;/li&gt;&lt;li&gt;&lt;i&gt;注意:&lt;/i&gt; カラムの型がテキストの場合、値の周囲に自動的にシングルクォーテーションが追加されます。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="comparison_title">⚡ 比較演算子 (&gt;, &lt;, &gt;=, &lt;=)</string>
+    <string name="comparison_body">&lt;p&gt;値の範囲（大なり、小なり）を比較します。数値や日付データに対して使用されます。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt; &lt;code&gt;price &gt; 500&lt;/code&gt; または &lt;code&gt;created_at &gt;= \'2026-01-01\'&lt;/code&gt;。&lt;/li&gt;&lt;li&gt;高額な注文、最近の新規登録アカウントなどを検索する際に役立ちます。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="like_title">🔍 LIKE 演算子 (パターンマッチング)</string>
+    <string name="like_body">&lt;p&gt;パターンに一致する文字列を検索します（大文字小文字の区別はDBエンジンによります）。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; 任意の文字列を表す &lt;code&gt;%&lt;/code&gt; や、任意の1文字を表す &lt;code&gt;_&lt;/code&gt; ワイルドカードを使用します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt;&lt;ul&gt;&lt;li&gt;&lt;code&gt;%An%&lt;/code&gt; と入力すると、「An」を含むすべての名前を検索します（例: An, Alan, Tina）。&lt;/li&gt;&lt;li&gt;&lt;code&gt;An%&lt;/code&gt; と入力すると、「An」で始まる名前を検索します。&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="between_title">📅 BETWEEN 演算子 (範囲チェック)</string>
+    <string name="between_body">&lt;p&gt;指定した範囲内に値が収まっているレコードを抽出します（両端の値を含みます）。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; 2つの値を &lt;code&gt;AND&lt;/code&gt; またはカンマ &lt;code&gt;,&lt;/code&gt; で区切って入力します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt;&lt;ul&gt;&lt;li&gt;&lt;code&gt;10 AND 100&lt;/code&gt; → 生成: &lt;code&gt;col BETWEEN 10 AND 100&lt;/code&gt;&lt;/li&gt;&lt;li&gt;&lt;code&gt;2026-01-01 AND 2026-05-31&lt;/code&gt; → 生成: &lt;code&gt;col BETWEEN \'2026-01-01\' AND \'2026-05-31\'&lt;/code&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="in_title">📦 IN 演算子 (リスト内検索)</string>
+    <string name="in_body">&lt;p&gt;カラムの値が指定のリストに含まれているか検証します。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; カンマ &lt;code&gt;,&lt;/code&gt; で区切って複数の値を入力します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt; &lt;code&gt;Active, Pending&lt;/code&gt; と入力 → 生成: &lt;code&gt;status IN (\'Active\', \'Pending\')&lt;/code&gt;。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="null_title">⭕ IS NULL / IS NOT NULL 演算子</string>
+    <string name="null_body">&lt;p&gt;カラムが空 (NULL) であるか、または空でないかを判定します。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt; &lt;code&gt;email IS NULL&lt;/code&gt; で、メールアドレスが登録されていないユーザーを検索します。&lt;/li&gt;&lt;li&gt;&lt;i&gt;注意:&lt;/i&gt; この演算子を選択すると、右側の値入力欄は自動的に非表示になります。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="exists_title">🧩 EXISTS / NOT EXISTS 演算子</string>
+    <string name="exists_body">&lt;p&gt;サブクエリ (Subquery) を使用して、関連データの存在を判定します。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; &lt;code&gt;EXISTS&lt;/code&gt; または &lt;code&gt;NOT EXISTS&lt;/code&gt; を選択し、右側にサブクエリを記述します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;サブクエリ例:&lt;/b&gt; &lt;code&gt;SELECT 1 FROM orders WHERE orders.user_id = users.id&lt;/code&gt;&lt;/li&gt;&lt;li&gt;&lt;b&gt;SQL 生成結果:&lt;/b&gt; &lt;code&gt;EXISTS (SELECT 1 FROM orders WHERE orders.user_id = users.id)&lt;/code&gt;&lt;/li&gt;&lt;li&gt;少なくとも1件以上の注文があるユーザー (EXISTS) または注文のないユーザー (NOT EXISTS) を抽出できます。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="groupby_title">📊 グループ化 (GROUP BY)</string>
+    <string name="groupby_body">&lt;p&gt;同じ値を持つ行をグループにまとめます。通常、SUM, COUNT, AVG, MIN, MAX などの集計関数と組み合わせて使用します。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; カラム順序ダイアログでカラムを右クリックして集計関数 (例: COUNT) を割り当ててから、「グループ化 (GROUP BY)」にカラムを追加します。&lt;/li&gt;&lt;li&gt;&lt;b&gt;例:&lt;/b&gt; 都市ごとの顧客数をカウントする:&lt;ul&gt;&lt;li&gt;表示カラム: &lt;code&gt;city&lt;/code&gt; と &lt;code&gt;COUNT(id)&lt;/code&gt;&lt;/li&gt;&lt;li&gt;グループ化: カラム &lt;code&gt;city&lt;/code&gt;&lt;/li&gt;&lt;li&gt;SQL 生成: &lt;code&gt;SELECT city, COUNT(id) FROM users GROUP BY city&lt;/code&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="orderby_title">🔀 並べ替え (ORDER BY)</string>
+    <string name="orderby_body">&lt;p&gt;結果を昇順 (ASC) または降順 (DESC) に並べ替えます。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; 「ソートを追加」をクリックし、並べ替えキーとなるカラムと順序を選択します。&lt;/li&gt;&lt;li&gt;複数指定して優先度を設定することも可能です（例：作成日の降順、次に名前の昇順）。&lt;/li&gt;&lt;/ul&gt;</string>
+
+    <string name="limit_title">🛑 行制限 (LIMIT / TOP)</string>
+    <string name="limit_body">&lt;p&gt;返される最大レコード数を制限します。&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;重要性:&lt;/b&gt; データベースのサイズが大きい場合、全行取得を行うとメモリやパフォーマンスの問題が生じます。制限を設けることで、瞬時のレスポンスが保証されます。&lt;/li&gt;&lt;li&gt;&lt;b&gt;使い方:&lt;/b&gt; 「行数制限:」の値に入力します。空欄の場合は制限が適用されません。&lt;/li&gt;&lt;li&gt;データベースの種類に応じ、自動的に &lt;code&gt;LIMIT N&lt;/code&gt; や &lt;code&gt;TOP N&lt;/code&gt; に変換されます。&lt;/li&gt;&lt;/ul&gt;</string>
+</resources>

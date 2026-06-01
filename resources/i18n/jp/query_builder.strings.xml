@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_table">テーブル選択</string>
+    <string name="group_columns">カラム選択</string>
+    <string name="search_columns_placeholder">カラムを検索...</string>
+    <string name="btn_selected_only">選択済み 👁️</string>
+    <string name="btn_columns_order">カラム順序 ⇅</string>
+    <string name="btn_columns_order_short">順序</string>
+    <string name="checkbox_distinct">重複を排除する</string>
+    <string name="label_limit">行数制限:</string>
+    <string name="limit_placeholder">制限なし</string>
+    <string name="group_where">抽出条件 (WHERE)</string>
+    <string name="btn_add_condition">条件を追加 ➕</string>
+    <string name="btn_guide">ガイド 📖</string>
+    <string name="group_groupby">グループ化 (GROUP BY)</string>
+    <string name="btn_add_groupby">グループ化を追加 ➕</string>
+    <string name="group_orderby">ソート順 (ORDER BY)</string>
+    <string name="btn_add_orderby">ソートを追加 ➕</string>
+    <string name="btn_delete">削除</string>
+    <string name="condition_value_placeholder">値...</string>
+    <string name="condition_value_to_placeholder">終値...</string>
+    <string name="sort_asc">昇順 (ASC)</string>
+    <string name="sort_desc">降順 (DESC)</string>
+    <string name="main_table_prefix">メインテーブル:</string>
+    <string name="joined_table_prefix">関連テーブル:</string>
+    <string name="btn_clear_selected">選択解除 ❌</string>
+</resources>

@@ -21,33 +21,9 @@ from sqlbot_desktop.models.entities import ConnectionProfile
 from sqlbot_desktop.infrastructure.database_manager import DatabaseManager
 from sqlbot_desktop.infrastructure.schema_extractor import SchemaExtractor
 from sqlbot_desktop.views.dialogs.schema_annotation_dialog import SchemaAnnotationDialog
+from sqlbot_desktop.utils.i18n_manager import tr
 
-
-DRIVER_LABELS = {
-    "MYSQL": "MySQL / MariaDB - bundled PyMySQL",
-    "POSTGRESQL": "PostgreSQL - bundled psycopg",
-}
-DRIVERS = list(DRIVER_LABELS.keys())
-DRIVER_HINTS = {
-    "MYSQL": "MySQL/MariaDB dùng PyMySQL đã đóng gói trong EXE, không cần Qt QMYSQL plugin.",
-    "POSTGRESQL": "PostgreSQL dùng psycopg binary đã đóng gói trong EXE, không cần cài libpq riêng.",
-}
-DRIVER_PLACEHOLDERS = {
-    "MYSQL": {
-        "host": "mysql.company.local hoặc 192.168.1.20",
-        "database": "sales_db",
-        "username": "report_user",
-        "password": "Nhập password MySQL/MariaDB để test",
-        "extra": "charset=utf8mb4",
-    },
-    "POSTGRESQL": {
-        "host": "postgres.company.local hoặc 192.168.1.30",
-        "database": "analytics_db",
-        "username": "readonly_user",
-        "password": "Nhập password PostgreSQL để test",
-        "extra": "sslmode=require",
-    },
-}
+DRIVERS = ["MYSQL", "POSTGRESQL"]
 DEFAULT_PORTS = {"MYSQL": 3306, "POSTGRESQL": 5432}
 
 
@@ -65,18 +41,12 @@ class ConnectionFormDialog(QDialog):
         self.original_profile = profile
         self.saved_profile: ConnectionProfile | None = None
 
-        self.setWindowTitle("Connection profile")
         self.setModal(True)
         self.setMinimumSize(560, 560)
 
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Ví dụ: Production Sales DB")
         self.description_input = QLineEdit()
-        self.description_input.setPlaceholderText("Ví dụ: CSDL doanh số cho phòng Kinh doanh")
         self.driver_combo = QComboBox()
-        for driver, label in DRIVER_LABELS.items():
-            self.driver_combo.addItem(label, driver)
-            self.driver_combo.setItemData(self.driver_combo.count() - 1, DRIVER_HINTS[driver], role=3)
         self.driver_hint_label = QLabel("")
         self.driver_hint_label.setObjectName("formHint")
         self.driver_hint_label.setWordWrap(True)
@@ -97,6 +67,7 @@ class ConnectionFormDialog(QDialog):
         self._build_ui()
         self._load_profile(profile)
         self._wire_events()
+        self.retranslate_ui()
 
     def profile(self) -> ConnectionProfile:
         port = self.port_input.value() or None
@@ -115,46 +86,94 @@ class ConnectionFormDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(14)
 
-        title = QLabel("Thông tin kết nối")
-        title.setObjectName("dialogTitle")
-        caption = QLabel("Password chỉ dùng để test hoặc lấy schema, không lưu vào file cấu hình.")
-        caption.setObjectName("dialogCaption")
-        caption.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(caption)
+        self.title_label = QLabel()
+        self.title_label.setObjectName("dialogTitle")
+        self.caption_label = QLabel()
+        self.caption_label.setObjectName("dialogCaption")
+        self.caption_label.setWordWrap(True)
+        layout.addWidget(self.title_label)
+        layout.addWidget(self.caption_label)
 
         form = QFormLayout()
         form.setLabelAlignment(form.labelAlignment())
-        form.addRow("Tên profile", self.name_input)
-        form.addRow("Diễn giải", self.description_input)
-        form.addRow("Driver", self.driver_combo)
-        form.addRow("", self.driver_hint_label)
-        form.addRow("Host", self.host_input)
-        form.addRow("Port", self.port_input)
-        form.addRow("Database", self.database_input)
+        
+        self.lbl_name = QLabel()
+        self.lbl_desc = QLabel()
+        self.lbl_driver = QLabel()
+        self.lbl_host = QLabel()
+        self.lbl_port = QLabel()
+        self.lbl_database = QLabel()
+        self.lbl_username = QLabel()
+        self.lbl_password = QLabel()
+        self.lbl_options = QLabel()
 
-        form.addRow("Username", self.username_input)
-        form.addRow("Password test", self.password_input)
-        form.addRow("Connection options", self.extra_input)
+        form.addRow(self.lbl_name, self.name_input)
+        form.addRow(self.lbl_desc, self.description_input)
+        form.addRow(self.lbl_driver, self.driver_combo)
+        form.addRow("", self.driver_hint_label)
+        form.addRow(self.lbl_host, self.host_input)
+        form.addRow(self.lbl_port, self.port_input)
+        form.addRow(self.lbl_database, self.database_input)
+        form.addRow(self.lbl_username, self.username_input)
+        form.addRow(self.lbl_password, self.password_input)
+        form.addRow(self.lbl_options, self.extra_input)
         layout.addLayout(form)
 
         actions = QHBoxLayout()
-        test_button = QPushButton("Test Connection")
-        test_button.setObjectName("secondaryButton")
-        test_button.clicked.connect(self._test_connection)
-        schema_button = QPushButton("Connect & Get Schema")
-        schema_button.setObjectName("primaryButton")
-        schema_button.clicked.connect(self._connect_get_schema)
-        actions.addWidget(test_button)
-        actions.addWidget(schema_button)
+        self.test_button = QPushButton()
+        self.test_button.setObjectName("secondaryButton")
+        self.test_button.clicked.connect(self._test_connection)
+        self.schema_button = QPushButton()
+        self.schema_button.setObjectName("primaryButton")
+        self.schema_button.clicked.connect(self._connect_get_schema)
+        actions.addWidget(self.test_button)
+        actions.addWidget(self.schema_button)
         layout.addLayout(actions)
 
         layout.addWidget(self.status_label)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self._save)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self._save)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+    def retranslate_ui(self) -> None:
+        self.setWindowTitle(tr("dialogs.conn_form_title", "Connection profile"))
+        self.title_label.setText(tr("dialogs.conn_form_heading", "Thông tin kết nối"))
+        self.caption_label.setText(tr("dialogs.conn_form_caption", "Password chỉ dùng để test hoặc lấy schema, không lưu vào file cấu hình."))
+        
+        self.lbl_name.setText(tr("dialogs.conn_form_label_name", "Tên profile"))
+        self.lbl_desc.setText(tr("dialogs.conn_form_label_desc", "Diễn giải"))
+        self.lbl_driver.setText(tr("dialogs.conn_form_label_driver", "Driver"))
+        self.lbl_host.setText(tr("dialogs.conn_form_label_host", "Host"))
+        self.lbl_port.setText(tr("dialogs.conn_form_label_port", "Port"))
+        self.lbl_database.setText(tr("dialogs.conn_form_label_database", "Database"))
+        self.lbl_username.setText(tr("dialogs.conn_form_label_username", "Username"))
+        self.lbl_password.setText(tr("dialogs.conn_form_label_password", "Password test"))
+        self.lbl_options.setText(tr("dialogs.conn_form_label_options", "Connection options"))
+
+        self.name_input.setPlaceholderText(tr("dialogs.conn_form_placeholder_name", "Ví dụ: Production Sales DB"))
+        self.description_input.setPlaceholderText(tr("dialogs.conn_form_placeholder_desc", "Ví dụ: CSDL doanh số cho phòng Kinh doanh"))
+
+        self.test_button.setText(tr("dialogs.conn_form_btn_test", "Test Connection"))
+        self.schema_button.setText(tr("dialogs.conn_form_btn_schema", "Connect & Get Schema"))
+
+        curr_driver = self.driver_combo.currentData()
+        self.driver_combo.blockSignals(True)
+        self.driver_combo.clear()
+        
+        driver_labels = {
+            "MYSQL": tr("dialogs.conn_form_driver_mysql", "MySQL / MariaDB - bundled PyMySQL"),
+            "POSTGRESQL": tr("dialogs.conn_form_driver_postgres", "PostgreSQL - bundled psycopg"),
+        }
+        for driver, label in driver_labels.items():
+            self.driver_combo.addItem(label, driver)
+        
+        idx = self.driver_combo.findData(curr_driver)
+        if idx >= 0:
+            self.driver_combo.setCurrentIndex(idx)
+        self.driver_combo.blockSignals(False)
+        self._sync_driver_fields()
 
     def _wire_events(self) -> None:
         self.driver_combo.currentIndexChanged.connect(self._sync_driver_fields)
@@ -185,14 +204,34 @@ class ConnectionFormDialog(QDialog):
         self.port_input.setEnabled(True)
         self.username_input.setEnabled(True)
         self.password_input.setEnabled(True)
-        hint = DRIVER_HINTS.get(driver, "")
-        self.driver_hint_label.setText(hint)
+        
+        driver_hints = {
+            "MYSQL": tr("dialogs.conn_form_hint_mysql", "MySQL/MariaDB dùng PyMySQL đã đóng gói trong EXE, không cần Qt QMYSQL plugin."),
+            "POSTGRESQL": tr("dialogs.conn_form_hint_postgres", "PostgreSQL dùng psycopg binary đã đóng gói trong EXE, không cần cài libpq riêng."),
+        }
+        self.driver_hint_label.setText(driver_hints.get(driver, ""))
         self._sync_placeholders(driver)
         if driver in DEFAULT_PORTS and self.port_input.value() == 0:
             self.port_input.setValue(DEFAULT_PORTS[driver])
 
     def _sync_placeholders(self, driver: str) -> None:
-        placeholders = DRIVER_PLACEHOLDERS.get(driver, {})
+        placeholders = {
+            "MYSQL": {
+                "host": tr("dialogs.conn_form_placeholder_host_mysql", "mysql.company.local hoặc 192.168.1.20"),
+                "database": "sales_db",
+                "username": "report_user",
+                "password": tr("dialogs.conn_form_placeholder_password_mysql", "Nhập password MySQL/MariaDB để test"),
+                "extra": "charset=utf8mb4",
+            },
+            "POSTGRESQL": {
+                "host": tr("dialogs.conn_form_placeholder_host_postgres", "postgres.company.local hoặc 192.168.1.30"),
+                "database": "analytics_db",
+                "username": "readonly_user",
+                "password": tr("dialogs.conn_form_placeholder_password_postgres", "Nhập password PostgreSQL để test"),
+                "extra": "sslmode=require",
+            },
+        }.get(driver, {})
+
         self.host_input.setPlaceholderText(placeholders.get("host", ""))
         self.database_input.setPlaceholderText(placeholders.get("database", ""))
         self.username_input.setPlaceholderText(placeholders.get("username", ""))
@@ -202,15 +241,15 @@ class ConnectionFormDialog(QDialog):
     def _validate(self) -> str:
         profile = self.profile()
         if not profile.name:
-            return "Vui lòng nhập tên profile."
+            return tr("dialogs.conn_form_val_name", "Vui lòng nhập tên profile.")
         if profile.driver not in DRIVERS:
-            return "Driver không hợp lệ."
+            return tr("dialogs.conn_form_val_driver", "Driver không hợp lệ.")
         if not profile.host:
-            return "Vui lòng nhập host."
+            return tr("dialogs.conn_form_val_host", "Vui lòng nhập host.")
         if not profile.database:
-            return "Vui lòng nhập database."
+            return tr("dialogs.conn_form_val_database", "Vui lòng nhập database.")
         if not self.username_input.text().strip():
-            return "Vui lòng nhập username."
+            return tr("dialogs.conn_form_val_username", "Vui lòng nhập username.")
         return ""
 
     def _test_connection(self) -> None:
@@ -249,7 +288,7 @@ class ConnectionFormDialog(QDialog):
     def _save(self) -> None:
         error = self._validate()
         if error:
-            QMessageBox.warning(self, "Thiếu thông tin", error)
+            QMessageBox.warning(self, tr("dialogs.conn_form_title_missing_info", "Thiếu thông tin"), error)
             return
 
         profile = self.profile()
@@ -288,8 +327,8 @@ class ConnectionFormDialog(QDialog):
         else:
             QMessageBox.warning(
                 self,
-                "Kết nối thất bại",
-                f"Không thể kết nối CSDL để tạo Schema Annotation: {result.message}\nProfile vẫn sẽ được lưu."
+                tr("dialogs.conn_form_title_failed_connection", "Kết nối thất bại"),
+                tr("dialogs.conn_form_msg_failed_connection", "Không thể kết nối CSDL để tạo Schema Annotation: ") + f"{result.message}\n" + tr("dialogs.conn_form_msg_profile_saved", "Profile vẫn sẽ được lưu.")
             )
 
         self.saved_profile = profile

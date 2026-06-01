@@ -22,7 +22,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QDialog
 
 
 
@@ -42,6 +42,7 @@ from sqlbot_desktop.infrastructure.schema_extractor import SchemaExtractor
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ConnectionProfile, GenerationResult
 from sqlbot_desktop.infrastructure.ai_settings_repository import AISettingsRepository
+from sqlbot_desktop.utils.i18n_manager import tr
 
 
 from sqlbot_desktop.services.ai_engine import AIEngine
@@ -60,7 +61,7 @@ from sqlbot_desktop.services.sql_extractor import SQLExtractor
 from sqlbot_desktop.services.text_to_sql_pipeline import TextToSqlPipeline, TextToSqlResult
 
 
-from sqlbot_desktop.views.dialogs.ai_settings_dialog import AISettingsDialog
+from sqlbot_desktop.views.dialogs.settings_dialog import SettingsDialog
 
 
 from sqlbot_desktop.views.dialogs.bookmark_dialog import AddBookmarkDialog, BookmarksDialog
@@ -318,6 +319,7 @@ class MainController:
         self.view.chat_view.anchorClicked.connect(self.handle_chat_link)
         self.view.show_results_requested.connect(self.view.show_results_dialog)
         self.view.clear_chat_requested.connect(self.clear_chat_history)
+        self.view.language_changed.connect(self.change_language)
 
 
         self.load_schema()
@@ -325,6 +327,11 @@ class MainController:
 
 
 
+
+    def change_language(self, lang_code: str) -> None:
+        from sqlbot_desktop.utils.i18n_manager import set_language
+        set_language(lang_code)
+        self.view.retranslate_ui()
 
     def show(self) -> None:
 
@@ -348,58 +355,36 @@ class MainController:
 
 
             tables = SchemaExtractor(self.database_manager.database(self.connection_name)).get_all_tables_columns()
-
-
         except Exception as exc:
-
-
-            self.view.statusBar().showMessage(f"Không thể tải schema: {exc}")
-
-
+            self.view.statusBar().showMessage(tr("main.msg_schema_failed", "Không thể tải schema: ") + f"{exc}")
             return
-
-
-
-
 
         self.tables = tables
 
-
         annotations = self.annotation_repository.load(self.profile.name)
 
-
-        self.view.set_schema(tables, annotations)
-
+        self.view.set_schema(tables, annotations, dialect=self.profile.driver)
 
         self.schema_context = PromptBuilder.build_schema_context(tables, annotations)
 
-
-
-
-
     def show_schema(self) -> None:
-
 
         self.view.show_schema_viewer()
 
-
-
-
-
     def generate_sql(self, question: str) -> None:
         if self.busy:
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
+            QMessageBox.information(self.view, tr("main.title_ai_busy", "AI đang bận"), tr("main.msg_wait_current_operation", "Vui lòng đợi thao tác hiện tại hoàn tất."))
             return
         if not question:
-            QMessageBox.information(self.view, "Thiếu câu hỏi", "Vui lòng nhập yêu cầu bằng tiếng Việt.")
+            QMessageBox.information(self.view, tr("main.title_missing_question", "Thiếu câu hỏi"), tr("main.msg_enter_requirement_vietnamese", "Vui lòng nhập yêu cầu bằng tiếng Việt."))
             return
 
         self.view.append_user_message(question)
-        self.view.append_status("AI đang suy nghĩ...")
+        self.view.append_status(tr("main.status_ai_thinking", "AI đang suy nghĩ..."))
 
         self._start_task(
-            "AI đang suy nghĩ...",
-            "Đang dịch câu hỏi sang truy vấn SQL.",
+            tr("main.status_ai_thinking", "AI đang suy nghĩ..."),
+            tr("main.status_translating_question", "Đang dịch câu hỏi sang truy vấn SQL."),
             lambda: self.text_to_sql_pipeline.generate(
                 question,
                 db_name=self.profile.name,
@@ -414,7 +399,6 @@ class MainController:
                 check_cancelled=self._is_task_cancelled,
             ),
             lambda result: self._handle_generate_result(question, result),
-            show_busy_panel=False,
             on_failed=lambda err: self._handle_generate_failed(question, err),
         )
 
@@ -429,7 +413,7 @@ class MainController:
             else:
                 self.view.append_assistant_message(result.message)
             if result.diagnostics.attempts > 1:
-                self.view.append_status(f"AI đã tự sửa SQL sau {result.diagnostics.attempts} lần.")
+                self.view.append_status(tr("main.status_ai_corrected_prefix", "AI đã tự sửa SQL sau ") + f"{result.diagnostics.attempts}" + tr("main.status_ai_corrected_suffix", " lần."))
 
             queries = result.queries if result.ok else []
         else:
@@ -446,23 +430,23 @@ class MainController:
             self.activity_repository.add_history(question, corrected_sql, True)
             attempts = result.diagnostics.attempts if isinstance(result, TextToSqlResult) else 1
             if attempts > 1:
-                self.view.statusBar().showMessage(f"Đã sinh SQL hợp lệ sau {attempts} lần thử.")
+                self.view.statusBar().showMessage(tr("main.status_sql_generated_attempts_prefix", "Đã sinh SQL hợp lệ sau ") + f"{attempts}" + tr("main.status_sql_generated_attempts_suffix", " lần thử."))
             else:
-                self.view.statusBar().showMessage("Đã trích xuất SQL từ phản hồi trợ lý.")
+                self.view.statusBar().showMessage(tr("main.status_sql_extracted", "Đang trích xuất SQL từ phản hồi trợ lý."))
         else:
             self.view.set_generated_queries([])
             self.activity_repository.add_history(question, "", False)
             if isinstance(result, TextToSqlResult) and result.message:
                 self.view.statusBar().showMessage(result.message)
             else:
-                self.view.statusBar().showMessage("AI phản hồi nhưng không tìm thấy câu SELECT hợp lệ.")
+                self.view.statusBar().showMessage(tr("main.status_sql_not_found", "AI phản hồi nhưng không tìm thấy câu SELECT hợp lệ."))
 
     def _handle_generate_failed(self, question: str, error_message: str) -> None:
         self.view.remove_status()
-        if error_message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError"):
-            self.view.append_assistant_message("Thao tác bị hủy.")
+        if error_message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError", tr("main.msg_cancelled", "Thao tác bị hủy")):
+            self.view.append_assistant_message(tr("main.msg_cancelled", "Thao tác bị hủy."))
         else:
-            self.view.append_assistant_message(f"Không thể hoàn thành yêu cầu: {error_message}")
+            self.view.append_assistant_message(tr("main.msg_request_failed_prefix", "Không thể hoàn thành yêu cầu: ") + f"{error_message}")
         self.activity_repository.add_history(question, "", False)
     def handle_chat_link(self, url: QUrl) -> None:
         href = url.toString()
@@ -473,181 +457,100 @@ class MainController:
             from PySide6.QtWidgets import QApplication
             prompt = href.partition("copy:")[2]
             QApplication.clipboard().setText(prompt)
-            self.view.statusBar().showMessage("Đã copy gợi ý vào clipboard.")
-
+            self.view.statusBar().showMessage(tr("main.status_suggest_copied", "Đã copy gợi ý vào clipboard."))
 
     def add_bookmark(self) -> None:
-
-
-        question = self.view.question_input.toPlainText().strip()
-
-
         sql = self.view.selected_query().strip()
-
-
-        if not question or not sql:
-
-
-            QMessageBox.information(self.view, "Thiếu dữ liệu", "Vui lòng có câu hỏi và SQL trước khi bookmark.")
-
-
+        if not sql:
+            QMessageBox.information(self.view, tr("dialogs.conn_form_title_missing_info", "Thiếu thông tin"), tr("dialogs.bookmarks_msg_missing_sql", "Vui lòng có câu lệnh SQL trước khi bookmark."))
             return
-
-
-
-
-
-        dialog = AddBookmarkDialog(question, sql, self.view)
-
-
-        if dialog.exec() != dialog.DialogCode.Accepted:
-
-
-            return
-
-
-
-
-
-        self.activity_repository.add_bookmark(question, sql, dialog.category, dialog.notes)
-
-
-        self.view.statusBar().showMessage("Đã lưu bookmark.")
-
-
-
-
+        dialog = AddBookmarkDialog(sql, self.view)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            bookmark_name = dialog.bookmark_name
+            self.activity_repository.add_bookmark(bookmark_name, sql, dialog.category, dialog.notes)
+            self.view.statusBar().showMessage(tr("main.status_bookmark_saved", "Đã lưu bookmark."))
 
     def copy_query(self) -> None:
 
-
         from PySide6.QtWidgets import QApplication
-
-
-
-
 
         sql = self.view.selected_query().strip()
 
-
         if not sql:
 
-
-            QMessageBox.information(self.view, "Chưa có SQL", "Không có Suggested Query để copy.")
-
+            QMessageBox.information(self.view, tr("main.title_no_sql", "Chưa có SQL"), tr("main.msg_no_sql_copy", "Không có Suggested Query để copy."))
 
             return
-
 
         QApplication.clipboard().setText(sql)
 
-
-        self.view.statusBar().showMessage("Đã copy SQL.")
-
-
-
-
+        self.view.statusBar().showMessage(tr("main.status_sql_copied", "Đã copy SQL."))
 
     def execute_query(self) -> None:
 
-
         if self.busy:
 
-
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
-
+            QMessageBox.information(self.view, tr("main.title_ai_busy", "AI đang bận"), tr("main.msg_wait_current_operation", "Vui lòng đợi thao tác hiện tại hoàn tất."))
 
             return
-
 
         if self.database_manager is None or not self.connection_name:
 
-
-            QMessageBox.warning(self.view, "Chưa có kết nối", "Không tìm thấy kết nối database đang hoạt động.")
-
+            QMessageBox.warning(self.view, tr("main.title_no_connection", "Chưa có kết nối"), tr("main.msg_no_active_connection", "Không tìm thấy kết nối database đang hoạt động."))
 
             return
-
-
-
-
 
         sql = self.view.selected_query().strip()
 
-
         if not sql:
 
-
-            QMessageBox.information(self.view, "Chưa có SQL", "Không có Suggested Query để execute.")
-
+            QMessageBox.information(self.view, tr("main.title_no_sql", "Chưa có SQL"), tr("main.msg_no_sql_execute", "Không có Suggested Query để execute."))
 
             return
-
 
         if not QueryValidator.is_readonly_select(sql):
 
-
-            QMessageBox.warning(self.view, "SQL không an toàn", "Chỉ cho phép thực thi câu SELECT.")
-
+            QMessageBox.warning(self.view, tr("main.title_unsafe_sql", "SQL không an toàn"), tr("main.msg_only_select_allowed", "Chỉ cho phép thực thi câu SELECT."))
 
             return
-
-
-
-
 
         self._start_task(
 
+            tr("main.status_processing_data", "Đang xử lý dữ liệu..."),
 
-            "Đang xử lý dữ liệu...",
-
-
-            "Đang thực thi SELECT và tải Query Results.",
-
+            tr("main.status_executing_select", "Đang thực thi SELECT và tải Query Results."),
 
             lambda: self.database_manager.execute_select(sql, self.connection_name),
 
-
             self._handle_execute_result,
-
 
         )
 
-
-
-
-
     def _handle_execute_result(self, result: QueryExecutionResult) -> None:
-
 
         if not result.ok:
 
-
-            QMessageBox.warning(self.view, "Execute thất bại", result.message)
-
+            QMessageBox.warning(self.view, tr("main.title_execute_failed", "Execute thất bại"), result.message)
 
             self.view.statusBar().showMessage(result.message)
 
-
             return
 
-
         self.view.set_query_results(result.columns or [], result.rows or [])
-
 
         self.view.statusBar().showMessage(result.message)
 
     def clear_chat_history(self) -> None:
         self.assistant_history = []
         self.view.clear_chat()
-        self.view.statusBar().showMessage("Đã xóa lịch sử phiên chat để giải phóng ngữ cảnh.")
+        self.view.statusBar().showMessage(tr("main.status_chat_cleared", "Đã xóa lịch sử phiên chat để giải phóng ngữ cảnh."))
 
     def refresh_sample_values(self) -> None:
         if self.busy:
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
+            QMessageBox.information(self.view, tr("main.title_ai_busy", "AI đang bận"), tr("main.msg_wait_current_operation", "Vui lòng đợi thao tác hiện tại hoàn tất."))
             return
         if self.database_manager is None or not self.connection_name:
-            QMessageBox.warning(self.view, "Chưa có kết nối", "Không tìm thấy kết nối database đang hoạt động.")
+            QMessageBox.warning(self.view, tr("main.title_no_connection", "Chưa có kết nối"), tr("main.msg_no_active_connection", "Không tìm thấy kết nối database đang hoạt động."))
             return
         if not self.tables:
             self.load_schema()
@@ -660,52 +563,40 @@ class MainController:
             return service.refresh_sample_values(self.profile.name, connection, limit=3)
 
         self._start_task(
-            "Đang lấy sample values...",
-            "Chỉ chạy SELECT để đọc tối đa 3 giá trị mẫu cho mỗi cột.",
+            tr("main.status_fetching_samples", "Đang lấy sample values..."),
+            tr("main.status_reading_samples_hint", "Chỉ chạy SELECT để đọc tối đa 3 giá trị mẫu cho mỗi cột."),
             operation,
             self._handle_sample_refresh_result,
         )
 
     def _handle_sample_refresh_result(self, messages: list[str]) -> None:
         if messages:
-            self.view.statusBar().showMessage(f"Đã cập nhật sample values, {len(messages)} cột có lỗi.")
+            self.view.statusBar().showMessage(tr("main.status_samples_updated_errors", "Đã cập nhật sample values, ") + f"{len(messages)}" + tr("main.status_columns_have_errors", " cột có lỗi."))
             QMessageBox.warning(self.view, "Sample values", "\n".join(messages[:10]))
             return
-        self.view.statusBar().showMessage("Đã cập nhật sample values vào metadata local.")
-
+        self.view.statusBar().showMessage(tr("main.status_samples_updated_success", "Đã cập nhật sample values vào metadata local."))
 
     def open_history(self) -> None:
-
-
         dialog = HistoryDialog(self.activity_repository, self.view)
-
-
-        dialog.load_requested.connect(self.view.set_question)
-
-
+        dialog.load_requested.connect(self.view.set_saved_query)
         dialog.exec()
-
-
-
-
 
     def open_bookmarks(self) -> None:
 
-
         dialog = BookmarksDialog(self.activity_repository, self.view)
-
 
         dialog.load_requested.connect(self.view.set_saved_query)
 
-
         dialog.exec()
 
-
-
-
-
     def open_settings(self) -> None:
-        dialog = AISettingsDialog(self.view.ai_model_config(), self.view)
+        dialog = SettingsDialog(
+            config=self.view.ai_model_config(),
+            connection_name=self.connection_name or "",
+            tables=self.tables or [],
+            repository=self.annotation_repository,
+            parent=self.view
+        )
         dialog.load_model_requested.connect(self.load_model)
         dialog.unload_model_requested.connect(self.unload_model)
 
@@ -716,152 +607,94 @@ class MainController:
         self.view.set_ai_model_config(config)
         self._apply_cpu_limit(config)
         self.ai_settings_repository.save_config(config)
-        self.view.statusBar().showMessage("Đã lưu AI settings.")
-
-
-
-
+        self.view.statusBar().showMessage(tr("main.status_ai_settings_saved", "Đã lưu cài đặt AI."))
 
     def load_model(self, config) -> None:
 
-
         if self.busy:
 
-
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
-
+            QMessageBox.information(self.view, tr("main.title_ai_busy", "AI đang bận"), tr("main.msg_wait_current_operation", "Vui lòng đợi thao tác hiện tại hoàn tất."))
 
             return
-
-
-
-
 
         validation_error = self._validate_model_config(config)
 
-
         if validation_error:
-
 
             self.view.set_model_status(validation_error, False)
 
-
-            QMessageBox.warning(self.view, "Load AI thất bại", validation_error)
-
+            QMessageBox.warning(self.view, tr("main.title_load_ai_failed", "Load AI thất bại"), validation_error)
 
             return
-
-
-
-
 
         self._apply_cpu_limit(config)
 
         self._start_task(
-            "Loading AI...",
-            "Đang load model GGUF local." if config.backend.value == "local" else "Đang kiểm tra cấu hình API AI.",
+            tr("main.status_loading_ai", "Loading AI..."),
+            tr("settings.status_loading_local", "Đang load model GGUF local.") if config.backend.value == "local" else tr("settings.status_checking_api", "Đang kiểm tra cấu hình API AI."),
             lambda: self.ai_engine.load(config, check_cancelled=self._is_task_cancelled),
             self._handle_load_result,
-            on_failed=lambda err: self.view.set_model_status(f"Load model thất bại: {err}", False)
+            on_failed=lambda err: self.view.set_model_status(tr("main.status_load_failed", "Load model thất bại: ") + f"{err}", False)
         )
-
-
-
-
 
     def _handle_load_result(self, result: GenerationResult) -> None:
 
-
         self.view.set_model_status(result.message, result.ok)
-
 
         if not result.ok:
 
-
-            QMessageBox.warning(self.view, "Load AI thất bại", result.message)
-
-
-
-
+            QMessageBox.warning(self.view, tr("main.title_load_ai_failed", "Load AI thất bại"), result.message)
 
     def unload_model(self) -> None:
 
-
         if self.busy:
 
-
-            QMessageBox.information(self.view, "AI đang bận", "Vui lòng đợi thao tác hiện tại hoàn tất.")
-
+            QMessageBox.information(self.view, tr("main.title_ai_busy", "AI đang bận"), tr("main.msg_wait_current_operation", "Vui lòng đợi thao tác hiện tại hoàn tất."))
 
             return
 
-
         self.ai_engine.unload()
 
-
-        self.view.set_model_status("AI đã unload", False)
-
-
-
-
+        self.view.set_model_status(tr("main.status_ai_unloaded", "AI đã unload"), False)
 
     def _validate_model_config(self, config: AIModelConfig) -> str:
 
-
         if config.backend == AIBackend.LOCAL:
-
 
             model_path_text = config.local_model_path.strip()
 
-
             if not model_path_text:
 
-
-                return "Vui lòng chọn file model GGUF trước khi bấm Load."
-
+                return tr("main.val_choose_gguf", "Vui lòng chọn file model GGUF trước khi bấm Load.")
 
             model_path = Path(model_path_text)
 
-
             if model_path.suffix.lower() != ".gguf":
 
-
-                return "Vui lòng chọn file model định dạng .gguf."
-
+                return tr("main.val_choose_gguf_format", "Vui lòng chọn file model định dạng .gguf.")
 
             if not model_path.exists():
 
-
-                return "File model không tồn tại."
-
+                return tr("main.val_model_not_exist", "File model không tồn tại.")
 
             return ""
 
-
-
-
-
         if not config.api_endpoint.strip():
 
-
-            return "Vui lòng nhập API endpoint."
-
+            return tr("main.val_enter_api_endpoint", "Vui lòng nhập API endpoint.")
 
         if not config.api_model.strip():
 
-
-            return "Vui lòng nhập API model."
-
+            return tr("main.val_enter_api_model", "Vui lòng nhập API model.")
 
         return ""
-
 
     def _apply_cpu_limit(self, config: AIModelConfig) -> None:
         try:
             message = CpuLimiter.apply(getattr(config, "cpu_thread_limit", 0))
             self.view.statusBar().showMessage(message)
         except OSError as exc:
-            self.view.statusBar().showMessage(f"Không thể giới hạn CPU cho app: {exc}")
+            self.view.statusBar().showMessage(tr("main.status_cpu_limit_error", "Không thể giới hạn CPU cho app: ") + f"{exc}")
 
 
 
@@ -957,16 +790,16 @@ class MainController:
             else:
 
 
-                if message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError"):
+                if message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError", tr("main.msg_cancelled", "Thao tác bị hủy")):
 
 
-                    self.view.statusBar().showMessage("Đã hủy thao tác.")
+                    self.view.statusBar().showMessage(tr("main.status_cancelled", "Đã hủy thao tác."))
 
 
                     return
 
 
-                QMessageBox.warning(self.view, "Sinh SQL thất bại", message)
+                QMessageBox.warning(self.view, tr("main.title_generate_sql_failed", "Sinh SQL thất bại"), message)
 
 
                 self.view.statusBar().showMessage(message)
