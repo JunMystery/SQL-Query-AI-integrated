@@ -52,6 +52,19 @@ class MainWindowBusyTests(unittest.TestCase):
 
         self.assertEqual(events, ["cancel"])
 
+    def test_chat_status_can_be_removed_without_clearing_chat(self) -> None:
+        window = MainWindow()
+        window.append_assistant_message("Ready")
+        window.append_status("Working")
+
+        self.assertIn("Ready", window.chat_view.toPlainText())
+        self.assertIn("Working", window.chat_view.toPlainText())
+
+        window.remove_status()
+
+        self.assertIn("Ready", window.chat_view.toPlainText())
+        self.assertNotIn("Working", window.chat_view.toPlainText())
+
     def test_ai_model_config_preserves_self_correction_retries(self) -> None:
         window = MainWindow()
 

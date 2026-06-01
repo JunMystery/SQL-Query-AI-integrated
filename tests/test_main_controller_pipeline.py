@@ -28,6 +28,7 @@ class FakeView:
         self.assistant_messages: list[str] = []
         self.status_messages: list[str] = []
         self.generated_queries: list[str] = []
+        self.busy_states: list[tuple[bool, str, str]] = []
         self._status_bar = FakeStatusBar()
 
     def append_user_message(self, text: str) -> None:
@@ -44,6 +45,9 @@ class FakeView:
 
     def set_generated_queries(self, queries: list[str]) -> None:
         self.generated_queries = queries
+
+    def set_busy(self, active: bool, title: str = "", detail: str = "") -> None:
+        self.busy_states.append((active, title, detail))
 
     def statusBar(self) -> FakeStatusBar:
         return self._status_bar
@@ -100,6 +104,29 @@ class FakePipeline:
         )
 
 
+class FakeAIEngine:
+    def __init__(self) -> None:
+        self.cancelled = False
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+
+class FakeWorkerThread:
+    def __init__(self) -> None:
+        self.interruption_requested = False
+        self.terminate_called = False
+
+    def isRunning(self) -> bool:
+        return True
+
+    def requestInterruption(self) -> None:
+        self.interruption_requested = True
+
+    def terminate(self) -> None:
+        self.terminate_called = True
+
+
 class MainControllerPipelineTests(unittest.TestCase):
     def make_controller(self) -> MainController:
         controller = MainController.__new__(MainController)
@@ -108,6 +135,7 @@ class MainControllerPipelineTests(unittest.TestCase):
         controller.schema_context = "TABLE users"
         controller.view = FakeView()
         controller.activity_repository = FakeActivityRepository()
+        controller.ai_engine = FakeAIEngine()
         controller.text_to_sql_pipeline = FakePipeline()
         controller.database_manager = FakeDatabaseManager()
         controller.connection_name = "conn1"
@@ -138,6 +166,20 @@ class MainControllerPipelineTests(unittest.TestCase):
         self.assertEqual(controller.view.generated_queries, ["SELECT id FROM users;"])
         self.assertEqual(controller.activity_repository.history, [("Lấy user", "SELECT id FROM users;", True)])
         self.assertIn("2 lần", controller.view.status_messages[-1])
+
+    def test_cancel_task_requests_cooperative_stop_without_terminating_thread(self) -> None:
+        controller = self.make_controller()
+        worker_thread = FakeWorkerThread()
+        controller.busy = True
+        controller.worker_thread = worker_thread
+
+        controller.cancel_task()
+
+        self.assertTrue(controller.task_cancelled)
+        self.assertTrue(controller.ai_engine.cancelled)
+        self.assertTrue(worker_thread.interruption_requested)
+        self.assertFalse(worker_thread.terminate_called)
+        self.assertTrue(controller.view.busy_states[-1][0])
 
 
 if __name__ == "__main__":

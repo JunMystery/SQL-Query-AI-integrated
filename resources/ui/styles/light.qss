@@ -88,6 +88,14 @@ QMenu::item:selected {
     color: #0f243f;
 }
 
+QToolTip {
+    background-color: #ffffff;
+    border: 1px solid #9fb0c6;
+    border-radius: 6px;
+    color: #182230;
+    padding: 6px 8px;
+}
+
 QFrame#brandPanel {
     background: #ffffff;
     border: 1px solid #d9e1ec;

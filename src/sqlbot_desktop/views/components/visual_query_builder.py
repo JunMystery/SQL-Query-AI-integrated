@@ -284,6 +284,21 @@ class ConditionRow(QWidget):
 
     changed = Signal()
     delete_requested = Signal(QWidget)
+    OPERATORS = [
+        "=",
+        "!=",
+        ">",
+        "<",
+        ">=",
+        "<=",
+        "LIKE",
+        "BETWEEN",
+        "IN",
+        "IS NULL",
+        "IS NOT NULL",
+        "EXISTS",
+        "NOT EXISTS",
+    ]
 
     def __init__(self, columns: list[ColumnInfo], annotations: dict[str, object] | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -326,9 +341,10 @@ class ConditionRow(QWidget):
         self.col_combo.currentIndexChanged.connect(self._update_placeholders_and_format)
 
         self.op_combo = StyledComboBox()
-        self.op_combo.addItems(["=", "!=", ">", "<", ">=", "<=", "LIKE", "BETWEEN", "IN", "IS NULL", "IS NOT NULL", "EXISTS", "NOT EXISTS"])
+        self._populate_operator_combo()
         self.op_combo.currentIndexChanged.connect(self._on_changed)
         self.op_combo.currentIndexChanged.connect(self._toggle_val_input)
+        self.op_combo.currentIndexChanged.connect(lambda _: self._update_operator_tooltip())
 
         self.val_input = QLineEdit()
         self.val_input.setObjectName("vqbValInput")
@@ -354,7 +370,39 @@ class ConditionRow(QWidget):
 
     def retranslate_ui(self) -> None:
         self.del_btn.setText(tr("query_builder.btn_delete", "Xóa"))
+        self._refresh_operator_tooltips()
         self._update_placeholders_and_format()
+
+    def _populate_operator_combo(self) -> None:
+        self.op_combo.addItems(self.OPERATORS)
+        self._refresh_operator_tooltips()
+
+    def _operator_tooltip(self, operator: str) -> str:
+        tooltips = {
+            "=": tr("query_builder.operator_tooltip_eq", "Bằng: chỉ lấy dòng có giá trị đúng bằng giá trị nhập."),
+            "!=": tr("query_builder.operator_tooltip_ne", "Khác: loại bỏ dòng có giá trị bằng giá trị nhập."),
+            ">": tr("query_builder.operator_tooltip_gt", "Lớn hơn: chỉ lấy dòng có giá trị lớn hơn giá trị nhập."),
+            "<": tr("query_builder.operator_tooltip_lt", "Nhỏ hơn: chỉ lấy dòng có giá trị nhỏ hơn giá trị nhập."),
+            ">=": tr("query_builder.operator_tooltip_gte", "Lớn hơn hoặc bằng: lấy dòng có giá trị từ ngưỡng nhập trở lên."),
+            "<=": tr("query_builder.operator_tooltip_lte", "Nhỏ hơn hoặc bằng: lấy dòng có giá trị không vượt quá ngưỡng nhập."),
+            "LIKE": tr("query_builder.operator_tooltip_like", "LIKE: tìm theo mẫu chuỗi. Dùng % để đại diện nhiều ký tự, ví dụ %abc%."),
+            "BETWEEN": tr("query_builder.operator_tooltip_between", "BETWEEN: lọc giá trị nằm trong khoảng, bao gồm cả giá trị bắt đầu và kết thúc."),
+            "IN": tr("query_builder.operator_tooltip_in", "IN: lọc một trong nhiều giá trị. Nhập danh sách phân tách bằng dấu phẩy."),
+            "IS NULL": tr("query_builder.operator_tooltip_is_null", "IS NULL: chỉ lấy dòng mà cột đang trống hoặc không có giá trị."),
+            "IS NOT NULL": tr("query_builder.operator_tooltip_is_not_null", "IS NOT NULL: chỉ lấy dòng mà cột có giá trị."),
+            "EXISTS": tr("query_builder.operator_tooltip_exists", "EXISTS: chỉ lấy dòng khi subquery bên phải trả về ít nhất một dòng."),
+            "NOT EXISTS": tr("query_builder.operator_tooltip_not_exists", "NOT EXISTS: chỉ lấy dòng khi subquery bên phải không trả về dòng nào."),
+        }
+        return tooltips.get(operator, "")
+
+    def _refresh_operator_tooltips(self) -> None:
+        for index in range(self.op_combo.count()):
+            operator = self.op_combo.itemText(index)
+            self.op_combo.setItemData(index, self._operator_tooltip(operator), Qt.ItemDataRole.ToolTipRole)
+        self._update_operator_tooltip()
+
+    def _update_operator_tooltip(self) -> None:
+        self.op_combo.setToolTip(self._operator_tooltip(self.op_combo.currentText()))
 
     def _on_changed(self, *args) -> None:
         self.changed.emit()

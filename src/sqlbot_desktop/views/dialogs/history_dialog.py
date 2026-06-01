@@ -113,16 +113,20 @@ class HistoryDialog(QDialog):
         self.entries = self.repository.list_history(date_filter)
         self.table.setRowCount(len(self.entries))
         self.table.blockSignals(True)
-        for row, entry in enumerate(self.entries):
-            status_text = tr("dialogs.history_status_ok", "OK") if entry.is_success else tr("dialogs.history_status_failed", "Failed")
-            self.table.setItem(row, 0, QTableWidgetItem(entry.timestamp))
-            self.table.setItem(row, 1, QTableWidgetItem(status_text))
-            self.table.setItem(row, 2, QTableWidgetItem(entry.question))
-            self.table.setItem(row, 3, QTableWidgetItem(entry.sql))
-            self.table.setItem(row, 4, QTableWidgetItem(str(entry.id)))
+        self.table.setUpdatesEnabled(False)
+        try:
+            for row, entry in enumerate(self.entries):
+                status_text = tr("dialogs.history_status_ok", "OK") if entry.is_success else tr("dialogs.history_status_failed", "Failed")
+                self.table.setItem(row, 0, QTableWidgetItem(entry.timestamp))
+                self.table.setItem(row, 1, QTableWidgetItem(status_text))
+                self.table.setItem(row, 2, QTableWidgetItem(entry.question))
+                self.table.setItem(row, 3, QTableWidgetItem(entry.sql))
+                self.table.setItem(row, 4, QTableWidgetItem(str(entry.id)))
 
-        self.table.blockSignals(False)
-        autosize_data_table_columns(self.table)
+            autosize_data_table_columns(self.table)
+        finally:
+            self.table.setUpdatesEnabled(True)
+            self.table.blockSignals(False)
         self.status_label.setText(f"{len(self.entries)} " + tr("dialogs.history_status_items", "items"))
 
     def _insert_entry(self, entry: HistoryEntry) -> None:

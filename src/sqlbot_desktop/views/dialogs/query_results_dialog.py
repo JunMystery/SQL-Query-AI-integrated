@@ -97,15 +97,19 @@ class QueryResultsDialog(QDialog):
         self.results_table.setHorizontalHeaderLabels(columns)
         self.results_table.setRowCount(len(rows))
 
-        for row_index, row in enumerate(rows):
-            for column_index, value in enumerate(row):
-                self.results_table.setItem(
-                    row_index,
-                    column_index,
-                    QTableWidgetItem("" if value is None else str(value)),
-                )
+        self.results_table.setUpdatesEnabled(False)
+        try:
+            for row_index, row in enumerate(rows):
+                for column_index, value in enumerate(row):
+                    self.results_table.setItem(
+                        row_index,
+                        column_index,
+                        QTableWidgetItem("" if value is None else str(value)),
+                    )
 
-        autosize_data_table_columns(self.results_table)
+            autosize_data_table_columns(self.results_table)
+        finally:
+            self.results_table.setUpdatesEnabled(True)
 
         self.summary_label.setText(
             tr("dialogs.query_results_summary_prefix", "Kết quả: Đã tải ") +

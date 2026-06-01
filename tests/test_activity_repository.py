@@ -55,6 +55,15 @@ class ActivityRepositoryTests(unittest.TestCase):
         self.assertEqual(updated.category, "ops")
         self.assertEqual(updated.notes, "changed")
 
+    def test_bookmarks_are_listed_with_default_limit(self) -> None:
+        for index in range(105):
+            self.repository.add_bookmark(f"question {index}", f"select {index};")
+
+        entries = self.repository.list_bookmarks()
+
+        self.assertEqual(len(entries), 100)
+        self.assertEqual(entries[0].question, "question 104")
+
 
 if __name__ == "__main__":
     unittest.main()

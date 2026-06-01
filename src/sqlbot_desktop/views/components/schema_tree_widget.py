@@ -41,7 +41,7 @@ class SchemaTreeWidget(QTreeWidget):
                 payload = column_payloads.get(column.name, {}) if isinstance(column_payloads, dict) else {}
                 self.add_column(table_item, column, payload)
 
-        self.expandAll()
+        self.collapseAll()
 
     def add_table(self, table: TableInfo, payload: dict[str, object] | None = None) -> QTreeWidgetItem:
         payload = payload or {}

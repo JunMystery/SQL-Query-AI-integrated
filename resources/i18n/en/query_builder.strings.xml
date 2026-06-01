@@ -24,4 +24,17 @@
     <string name="main_table_prefix">Main Table:</string>
     <string name="joined_table_prefix">Joined Table:</string>
     <string name="btn_clear_selected">Clear all selected ❌</string>
+    <string name="operator_tooltip_eq">Equals: keeps rows where the value exactly matches the input.</string>
+    <string name="operator_tooltip_ne">Not equal: excludes rows where the value matches the input.</string>
+    <string name="operator_tooltip_gt">Greater than: keeps rows with values above the input.</string>
+    <string name="operator_tooltip_lt">Less than: keeps rows with values below the input.</string>
+    <string name="operator_tooltip_gte">Greater than or equal: keeps rows from the input threshold upward.</string>
+    <string name="operator_tooltip_lte">Less than or equal: keeps rows that do not exceed the input threshold.</string>
+    <string name="operator_tooltip_like">LIKE: matches text patterns. Use % as a wildcard, for example %abc%.</string>
+    <string name="operator_tooltip_between">BETWEEN: filters values inside an inclusive start-to-end range.</string>
+    <string name="operator_tooltip_in">IN: matches any value from a list. Enter comma-separated values.</string>
+    <string name="operator_tooltip_is_null">IS NULL: keeps rows where the column is empty or has no value.</string>
+    <string name="operator_tooltip_is_not_null">IS NOT NULL: keeps rows where the column has a value.</string>
+    <string name="operator_tooltip_exists">EXISTS: keeps rows when the subquery on the right returns at least one row.</string>
+    <string name="operator_tooltip_not_exists">NOT EXISTS: keeps rows when the subquery on the right returns no rows.</string>
 </resources>

@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -42,6 +43,46 @@ class AIEngineTests(unittest.TestCase):
 
         self.assertFalse(result.ok)
         self.assertIn("hủy", result.message.lower())
+
+    def test_api_request_uses_bounded_timeout(self) -> None:
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return b'{"choices":[{"message":{"content":"```sql\\nSELECT 1;\\n```"}}]}'
+
+        engine = AIEngine()
+        engine.config = AIModelConfig(
+            backend=AIBackend.API,
+            api_endpoint="http://dummy",
+            api_model="dummy",
+        )
+
+        with patch("urllib.request.urlopen", return_value=FakeResponse()) as mocked_urlopen:
+            result = engine.generate("List users")
+
+        self.assertTrue(result.ok)
+        self.assertLessEqual(mocked_urlopen.call_args.kwargs["timeout"], 60)
+
+    def test_cancel_closes_active_api_response(self) -> None:
+        class FakeResponse:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        engine = AIEngine()
+        response = FakeResponse()
+        engine._active_response = response
+
+        engine.cancel()
+
+        self.assertTrue(response.closed)
 
 
 if __name__ == "__main__":

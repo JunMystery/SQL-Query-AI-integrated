@@ -13,6 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from sqlbot_desktop.models.entities import ColumnInfo, TableInfo
@@ -72,6 +73,16 @@ class VisualQueryBuilderTests(unittest.TestCase):
         row_dt.val_input.setText("2026-06-01 12:00")
         row_dt.val_input_2.setText("2026-06-02")
         self.assertEqual(row_dt.get_sql(), "created_at BETWEEN '2026-06-01 12:00:00.000' AND '2026-06-02 00:00:00.000'")
+
+    def test_filter_operator_combo_has_tooltips_for_all_operators(self) -> None:
+        row = ConditionRow([ColumnInfo("age", "INTEGER")])
+
+        for index in range(row.op_combo.count()):
+            row.op_combo.setCurrentIndex(index)
+            tooltip = row.op_combo.itemData(index, Qt.ItemDataRole.ToolTipRole)
+
+            self.assertTrue(tooltip, row.op_combo.itemText(index))
+            self.assertEqual(row.op_combo.toolTip(), tooltip)
 
     def test_visual_query_builder_table_population(self) -> None:
         panel = VisualQueryBuilderPanel()

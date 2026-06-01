@@ -71,12 +71,11 @@ class TextToSqlPipelineTests(unittest.TestCase):
         self.assertIn("## Table: users", ai.prompts[0])
         self.assertNotIn("fallback schema", ai.prompts[0])
 
-    def test_pipeline_defaults_to_neural_embedding_with_deterministic_fallback(self) -> None:
+    def test_pipeline_defaults_to_deterministic_embedding_for_fast_startup(self) -> None:
         ai = FakeAIEngine(GenerationResult(True, message="SELECT * FROM fallback_table;"))
         pipeline = TextToSqlPipeline(ai, self.metadata, few_shot_repository=self.few_shots)
 
-        self.assertEqual(type(pipeline.embedding_model).__name__, "SentenceTransformersEmbeddingModel")
-        self.assertEqual(type(pipeline.embedding_model.fallback_model).__name__, "DeterministicEmbeddingModel")
+        self.assertEqual(type(pipeline.embedding_model).__name__, "DeterministicEmbeddingModel")
 
     def test_pipeline_falls_back_when_metadata_is_empty(self) -> None:
         ai = FakeAIEngine(GenerationResult(True, message="SELECT * FROM fallback_table;"))

@@ -72,9 +72,9 @@ class AISettingsWidget(QWidget):
         self.test_output = QTextEdit()
         self.local_panel = QFrame()
         self.api_panel = QFrame()
+        self._model_scan_cache: list[Path] = []
 
         self._build_ui()
-        self._load_models()
         self.set_config(config)
         self._sync_mode()
 
@@ -365,7 +365,8 @@ class AISettingsWidget(QWidget):
         current_path = self.model_path_input.text().strip()
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
-        for model_path in self._model_files():
+        self._model_scan_cache = self._model_files()
+        for model_path in self._model_scan_cache:
             self.model_combo.addItem(model_path.name, str(model_path))
         self.model_combo.blockSignals(False)
         self._select_model_path(current_path)
@@ -377,15 +378,31 @@ class AISettingsWidget(QWidget):
     def _model_files(self) -> list[Path]:
         roots = [Path("models"), Path("AI Models")]
         files: list[Path] = []
+        max_results = 100
         for root in roots:
-            if root.exists():
-                files.extend(path for path in root.rglob("*.gguf") if path.is_file())
+            if not root.exists():
+                continue
+            try:
+                candidates = list(root.glob("*.gguf"))
+                for child in root.iterdir():
+                    if child.is_dir():
+                        candidates.extend(child.glob("*.gguf"))
+            except OSError:
+                continue
+            for path in candidates:
+                if path.is_file():
+                    files.append(path)
+                if len(files) >= max_results:
+                    return sorted(files, key=lambda item: item.name.lower())
         return sorted(files, key=lambda path: path.name.lower())
 
     def _select_model_path(self, model_path: str) -> None:
         if not model_path:
             return
         index = self.model_combo.findData(model_path)
+        if index < 0 and Path(model_path).exists():
+            self.model_combo.addItem(Path(model_path).name, model_path)
+            index = self.model_combo.findData(model_path)
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
 

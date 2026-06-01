@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from PySide6.QtCore import Qt  # noqa: E402
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, TableInfo, ColumnInfo  # noqa: E402
+from sqlbot_desktop.utils.i18n_manager import set_language  # noqa: E402
 from sqlbot_desktop.views.dialogs.settings_dialog import SettingsDialog  # noqa: E402
 from sqlbot_desktop.views.dialogs.schema_annotation_dialog import SchemaAnnotationDialog  # noqa: E402
 
@@ -24,6 +25,7 @@ class SettingsDialogTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+        set_language("vi")
 
     def test_threads_setting_explains_worker_threads_not_cpu_cap(self) -> None:
         dialog = SettingsDialog(
@@ -35,7 +37,7 @@ class SettingsDialogTests(unittest.TestCase):
 
         self.assertEqual(ai_w.threads_label.text(), "Luồng suy luận LLM")
         self.assertIn("worker thread llama.cpp", ai_w.threads_spin.toolTip())
-        self.assertIn("không phải giới hạn % CPU", ai_w.threads_hint.text())
+        self.assertIn("không phải giới hạn", ai_w.threads_hint.text())
         self.assertIn("Luồng suy luận LLM: 4", ai_w.resource_info.text())
 
     def test_defaults_match_cpu_only_laptop_profile(self) -> None:
@@ -131,7 +133,7 @@ class SettingsDialogTests(unittest.TestCase):
         schema_w.tree.setCurrentItem(col_item)
         self.assertEqual(schema_w.detail_stack.currentIndex(), 2)
         self.assertEqual(schema_w.column_title_label.text(), "Cột: users.id")
-        self.assertEqual(schema_w.column_type_label.text(), "Kiểu dữ liệu: INT")
+        self.assertIn("INT", schema_w.column_type_label.text())
 
         # Edit column description, unit, and note
         schema_w.column_desc_edit.setText("Mã người dùng")

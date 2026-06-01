@@ -33,6 +33,8 @@ class ThemeTests(unittest.TestCase):
         self.assertIn("QDockWidget#schemaDock::float-button", light_style)
         self.assertIn("QToolButton#schemaDockCloseButton", light_style)
         self.assertIn("QToolButton#schemaDockFloatButton", light_style)
+        self.assertIn("QToolTip", light_style)
+        self.assertIn("background-color: #ffffff", light_style)
         self.assertNotIn("titlebar-close-icon: none", light_style)
 
         # Load dark style explicitly
@@ -44,6 +46,8 @@ class ThemeTests(unittest.TestCase):
         self.assertIn("QDockWidget#schemaDock::float-button", dark_style)
         self.assertIn("QToolButton#schemaDockCloseButton", dark_style)
         self.assertIn("QToolButton#schemaDockFloatButton", dark_style)
+        self.assertIn("QToolTip", dark_style)
+        self.assertIn("background-color: #18181b", dark_style)
         self.assertNotIn("titlebar-close-icon: none", dark_style)
 
     def test_main_window_theme_switching_menu(self) -> None:

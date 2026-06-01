@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -83,9 +84,18 @@ class SchemaMetadataService:
             json.dump(payload, file, ensure_ascii=False, indent=2)
         return path
 
-    def refresh_sample_values(self, db_name: str, connection: Connection, limit: int = 3) -> list[str]:
+    def refresh_sample_values(
+        self,
+        db_name: str,
+        connection: Connection,
+        limit: int = 3,
+        check_cancelled: Callable[[], bool] | None = None,
+    ) -> list[str]:
         messages: list[str] = []
+        grouped_columns: dict[str, list[ColumnMetadata]] = {}
         for metadata in self.repository.list_columns(db_name):
+            if check_cancelled and check_cancelled():
+                return messages
             if self._should_skip_samples(metadata):
                 self.repository.update_sample_values(
                     db_name,
@@ -95,11 +105,28 @@ class SchemaMetadataService:
                 )
                 continue
 
+            grouped_columns.setdefault(metadata.table_name, []).append(metadata)
+
+        for table_name, columns in grouped_columns.items():
+            if check_cancelled and check_cancelled():
+                break
             try:
-                samples = self._fetch_sample_values(connection, metadata.table_name, metadata.column_name, limit)
-                self.repository.update_sample_values(db_name, metadata.table_name, metadata.column_name, samples)
+                table_samples = self._fetch_table_sample_values(
+                    connection,
+                    table_name,
+                    [metadata.column_name for metadata in columns],
+                    limit,
+                )
             except Exception as exc:
-                messages.append(f"{metadata.table_name}.{metadata.column_name}: {exc}")
+                for metadata in columns:
+                    messages.append(f"{metadata.table_name}.{metadata.column_name}: {exc}")
+                continue
+
+            for metadata in columns:
+                if check_cancelled and check_cancelled():
+                    return messages
+                samples = table_samples.get(metadata.column_name, [])
+                self.repository.update_sample_values(db_name, metadata.table_name, metadata.column_name, samples)
         return messages
 
     def refresh_embeddings(
@@ -143,6 +170,34 @@ class SchemaMetadataService:
         )
         values = connection.execute(statement).fetchall()
         return [self._clip_sample(row[0]) for row in values if row[0] is not None]
+
+    def _fetch_table_sample_values(
+        self,
+        connection: Connection,
+        table_name: str,
+        column_names: list[str],
+        limit: int,
+    ) -> dict[str, list[str]]:
+        if not column_names:
+            return {}
+        unique_names = list(dict.fromkeys(column_names))
+        column_refs = [column(quoted_name(column_name, True)) for column_name in unique_names]
+        table_ref = table(quoted_name(table_name, True), *column_refs)
+        scan_limit = max(1, min(max(limit * 20, limit), 200))
+        statement = select(*table_ref.c).select_from(table_ref).limit(scan_limit)
+        rows = connection.execute(statement).fetchall()
+        samples = {column_name: [] for column_name in unique_names}
+        for row in rows:
+            for index, column_name in enumerate(unique_names):
+                if len(samples[column_name]) >= limit:
+                    continue
+                value = row[index]
+                if value is None:
+                    continue
+                sample = self._clip_sample(value)
+                if sample and sample not in samples[column_name]:
+                    samples[column_name].append(sample)
+        return samples
 
     def _foreign_key_map(self, table_info: TableInfo) -> dict[str, tuple[str, str]]:
         mapping: dict[str, tuple[str, str]] = {}

@@ -27,10 +27,28 @@ def configure_data_table(table: QTableWidget, accessible_name: str) -> None:
     table.verticalHeader().setVisible(False)
 
 
-def autosize_data_table_columns(table: QTableWidget, max_initial_width: int = 260) -> None:
-    """Size columns to content once, while keeping user resizing interactive."""
-    table.resizeColumnsToContents()
+def autosize_data_table_columns(
+    table: QTableWidget,
+    max_initial_width: int = 260,
+    sample_rows: int = 50,
+) -> None:
+    """Set a bounded initial width without measuring every cell."""
+    font_metrics = table.fontMetrics()
+    header_metrics = table.horizontalHeader().fontMetrics()
+    visible_rows = min(table.rowCount(), max(0, sample_rows))
     for column in range(table.columnCount()):
-        if not table.isColumnHidden(column) and table.columnWidth(column) > max_initial_width:
-            table.setColumnWidth(column, max_initial_width)
+        if table.isColumnHidden(column):
+            continue
+        header_item = table.horizontalHeaderItem(column)
+        header_text = header_item.text() if header_item is not None else ""
+        width = header_metrics.horizontalAdvance(header_text) + 36
+        for row in range(visible_rows):
+            item = table.item(row, column)
+            if item is None:
+                continue
+            width = max(width, font_metrics.horizontalAdvance(item.text()) + 32)
+            if width >= max_initial_width:
+                width = max_initial_width
+                break
+        table.setColumnWidth(column, max(64, min(width, max_initial_width)))
     table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)

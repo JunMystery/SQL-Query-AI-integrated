@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QFont, QColor, QTextCursor
 
 from sqlbot_desktop.models.entities import AIBackend, AIModelConfig, ColumnInfo, ConnectionProfile, TableInfo
 from sqlbot_desktop.services.app_config import AppConfig
@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
         self._ai_config = AIModelConfig(backend=AIBackend.LOCAL)
         self._tables = []
         self._annotations = {}
+        self._status_range: tuple[int, int] | None = None
 
         self._build_menu()
         self._build_ui()
@@ -691,22 +692,38 @@ class MainWindow(QMainWindow):
         self._scroll_chat_to_bottom()
 
     def append_status(self, text: str) -> None:
+        self.remove_status()
         html = (
             f"<div id='assistantStatus' style='margin: 4px 0; text-align: left; color: #697789; font-style: italic;'>"
             f"  {text}"
             f"</div>"
         )
-        self.chat_view.append(html)
+        cursor = QTextCursor(self.chat_view.document())
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        start = cursor.position()
+        cursor.insertHtml(html)
+        cursor.insertBlock()
+        self._status_range = (start, cursor.position())
         self._scroll_chat_to_bottom()
 
     def remove_status(self) -> None:
+        if self._status_range is None:
+            return
         doc = self.chat_view.document()
-        html = doc.toHtml()
-        clean_html = html.replace("<div id=\"assistantStatus\"", "<div style=\"display:none;\"")
-        self.chat_view.setHtml(clean_html)
+        start, end = self._status_range
+        max_position = max(0, doc.characterCount() - 1)
+        start = min(start, max_position)
+        end = min(end, max_position)
+        if start < end:
+            cursor = QTextCursor(doc)
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+        self._status_range = None
         self._scroll_chat_to_bottom()
 
     def clear_chat(self) -> None:
+        self._status_range = None
         self.chat_view.clear()
         welcome = (
             f"<div style='background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; "

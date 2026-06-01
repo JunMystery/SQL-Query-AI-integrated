@@ -24,4 +24,17 @@
     <string name="main_table_prefix">Bảng chính:</string>
     <string name="joined_table_prefix">Bảng liên kết:</string>
     <string name="btn_clear_selected">Bỏ chọn tất cả ❌</string>
+    <string name="operator_tooltip_eq">Bằng: chỉ lấy dòng có giá trị đúng bằng giá trị nhập.</string>
+    <string name="operator_tooltip_ne">Khác: loại bỏ dòng có giá trị bằng giá trị nhập.</string>
+    <string name="operator_tooltip_gt">Lớn hơn: chỉ lấy dòng có giá trị lớn hơn giá trị nhập.</string>
+    <string name="operator_tooltip_lt">Nhỏ hơn: chỉ lấy dòng có giá trị nhỏ hơn giá trị nhập.</string>
+    <string name="operator_tooltip_gte">Lớn hơn hoặc bằng: lấy dòng có giá trị từ ngưỡng nhập trở lên.</string>
+    <string name="operator_tooltip_lte">Nhỏ hơn hoặc bằng: lấy dòng có giá trị không vượt quá ngưỡng nhập.</string>
+    <string name="operator_tooltip_like">LIKE: tìm theo mẫu chuỗi. Dùng % để đại diện nhiều ký tự, ví dụ %abc%.</string>
+    <string name="operator_tooltip_between">BETWEEN: lọc giá trị nằm trong khoảng, bao gồm cả giá trị bắt đầu và kết thúc.</string>
+    <string name="operator_tooltip_in">IN: lọc một trong nhiều giá trị. Nhập danh sách phân tách bằng dấu phẩy.</string>
+    <string name="operator_tooltip_is_null">IS NULL: chỉ lấy dòng mà cột đang trống hoặc không có giá trị.</string>
+    <string name="operator_tooltip_is_not_null">IS NOT NULL: chỉ lấy dòng mà cột có giá trị.</string>
+    <string name="operator_tooltip_exists">EXISTS: chỉ lấy dòng khi subquery bên phải trả về ít nhất một dòng.</string>
+    <string name="operator_tooltip_not_exists">NOT EXISTS: chỉ lấy dòng khi subquery bên phải không trả về dòng nào.</string>
 </resources>

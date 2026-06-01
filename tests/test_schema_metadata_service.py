@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -142,6 +142,13 @@ class SchemaMetadataServiceTests(unittest.TestCase):
 
     def test_refresh_sample_values_uses_safe_selects_and_skips_sensitive_columns(self) -> None:
         engine = create_engine("sqlite:///:memory:", future=True)
+        select_statements: list[str] = []
+
+        @event.listens_for(engine, "before_cursor_execute")
+        def track_selects(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().upper().startswith("SELECT"):
+                select_statements.append(statement)
+
         with engine.connect() as connection:
             connection.execute(text("CREATE TABLE users (id INTEGER, name TEXT, password_hash TEXT)"))
             connection.execute(text("INSERT INTO users VALUES (1, 'Lan', 'secret')"))
@@ -176,6 +183,7 @@ class SchemaMetadataServiceTests(unittest.TestCase):
         assert password is not None
         self.assertEqual(name.sample_values, ["Lan", "Minh", "Tu"])
         self.assertEqual(password.sample_values, ["[REDACTED]"])
+        self.assertEqual(len(select_statements), 1)
 
     def test_refresh_sample_values_collects_per_column_errors(self) -> None:
         engine = create_engine("sqlite:///:memory:", future=True)

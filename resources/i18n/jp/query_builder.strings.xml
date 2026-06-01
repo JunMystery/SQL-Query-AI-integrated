@@ -24,4 +24,17 @@
     <string name="main_table_prefix">メインテーブル:</string>
     <string name="joined_table_prefix">関連テーブル:</string>
     <string name="btn_clear_selected">選択解除 ❌</string>
+    <string name="operator_tooltip_eq">等しい: 入力値と完全に一致する行だけを抽出します。</string>
+    <string name="operator_tooltip_ne">等しくない: 入力値と一致する行を除外します。</string>
+    <string name="operator_tooltip_gt">より大きい: 入力値より大きい値の行を抽出します。</string>
+    <string name="operator_tooltip_lt">より小さい: 入力値より小さい値の行を抽出します。</string>
+    <string name="operator_tooltip_gte">以上: 入力したしきい値以上の行を抽出します。</string>
+    <string name="operator_tooltip_lte">以下: 入力したしきい値以下の行を抽出します。</string>
+    <string name="operator_tooltip_like">LIKE: 文字列パターンで検索します。% は任意の文字列を表します。例: %abc%。</string>
+    <string name="operator_tooltip_between">BETWEEN: 開始値と終了値を含む範囲内の値を抽出します。</string>
+    <string name="operator_tooltip_in">IN: 複数候補のいずれかに一致する値を抽出します。カンマ区切りで入力します。</string>
+    <string name="operator_tooltip_is_null">IS NULL: カラムが空、または値がない行だけを抽出します。</string>
+    <string name="operator_tooltip_is_not_null">IS NOT NULL: カラムに値がある行だけを抽出します。</string>
+    <string name="operator_tooltip_exists">EXISTS: 右側のサブクエリが1行以上返す場合に抽出します。</string>
+    <string name="operator_tooltip_not_exists">NOT EXISTS: 右側のサブクエリが行を返さない場合に抽出します。</string>
 </resources>

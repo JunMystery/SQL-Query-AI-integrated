@@ -14,7 +14,6 @@ from sqlbot_desktop.models.entities import GenerationResult
 from sqlbot_desktop.services.embedding_service import (
     DeterministicEmbeddingModel,
     EmbeddingModel,
-    SentenceTransformersEmbeddingModel,
 )
 from sqlbot_desktop.services.prompt_builder import PromptBuilder
 from sqlbot_desktop.services.query_logger import QueryAttempt, QueryLogger
@@ -74,15 +73,17 @@ class TextToSqlPipeline:
         embedding_model: EmbeddingModel | None = None,
         few_shot_repository: FewShotRepository | None = None,
         query_logger: QueryLogger | None = None,
+        use_advanced_agent: bool = False,
     ) -> None:
         self.ai_engine = ai_engine
         self.metadata_repository = metadata_repository or SchemaMetadataRepository()
         self.embedding_model = embedding_model or self._default_embedding_model()
         self.few_shot_repository = few_shot_repository or FewShotRepository()
         self.query_logger = query_logger
+        self.use_advanced_agent = use_advanced_agent
 
     def _default_embedding_model(self) -> EmbeddingModel:
-        return SentenceTransformersEmbeddingModel(fallback_model=DeterministicEmbeddingModel())
+        return DeterministicEmbeddingModel()
 
     def generate(
         self,
@@ -96,32 +97,36 @@ class TextToSqlPipeline:
     ) -> TextToSqlResult:
         schema_context, base_diagnostics = self._schema_context(db_name, question, fallback_schema_context)
         
-        # Try generating using AdvancedSQLAgent
-        try:
-            from sqlbot_desktop.agents.advanced_sql_agent import AdvancedSQLAgent
-            agent = AdvancedSQLAgent(self.ai_engine)
-            metadata = []
-            if self.metadata_repository:
-                metadata = self.metadata_repository.list_columns(db_name)
-            agent.metadata_list = metadata
-            
-            generated_query = agent.generate_sql(question, dialect=dialect.lower())
-            if generated_query:
-                execution = None
-                if execute_sql:
-                    execution = execute_sql(generated_query)
-                if not execution or execution.ok:
-                    return TextToSqlResult(
-                        ok=True,
-                        queries=[generated_query],
-                        message="Đã sinh SQL bằng Advanced SQL Agent.",
-                        raw_text=f"```sql\n{generated_query}\n```",
-                        prompt="[Advanced SQL Agent Pipeline]",
-                        diagnostics=base_diagnostics,
-                        execution_result=execution,
-                    )
-        except Exception as e:
-            logger.warning("Advanced SQL Agent failed, falling back: %s", e)
+        if self.use_advanced_agent:
+            try:
+                if check_cancelled and check_cancelled():
+                    return self._cancelled_result(base_diagnostics)
+                from sqlbot_desktop.agents.advanced_sql_agent import AdvancedSQLAgent
+                agent = AdvancedSQLAgent(self.ai_engine)
+                metadata = []
+                if self.metadata_repository:
+                    metadata = self.metadata_repository.list_columns(db_name)
+                agent.metadata_list = metadata
+
+                generated_query = agent.generate_sql(question, dialect=dialect.lower())
+                if check_cancelled and check_cancelled():
+                    return self._cancelled_result(base_diagnostics)
+                if generated_query:
+                    execution = None
+                    if execute_sql:
+                        execution = execute_sql(generated_query)
+                    if not execution or execution.ok:
+                        return TextToSqlResult(
+                            ok=True,
+                            queries=[generated_query],
+                            message="Đã sinh SQL bằng Advanced SQL Agent.",
+                            raw_text=f"```sql\n{generated_query}\n```",
+                            prompt="[Advanced SQL Agent Pipeline]",
+                            diagnostics=base_diagnostics,
+                            execution_result=execution,
+                        )
+            except Exception as e:
+                logger.warning("Advanced SQL Agent failed, falling back: %s", e)
 
         selected_examples = self.few_shot_repository.select_examples(question, dialect)
         few_shots = [example.to_prompt_dict() for example in selected_examples] if selected_examples else None
@@ -240,6 +245,14 @@ class TextToSqlPipeline:
             prompt=last_prompt,
             diagnostics=self._with_attempt(base_diagnostics, attempts, error_message, error_history),
             execution_result=last_execution,
+        )
+
+    def _cancelled_result(self, diagnostics: TextToSqlDiagnostics) -> TextToSqlResult:
+        message = "Thao tac bi huy"
+        return TextToSqlResult(
+            False,
+            message=message,
+            diagnostics=self._with_attempt(diagnostics, 1, message, [message]),
         )
 
     def _log_attempt(self, question: str, attempt: int, sql: str, error: str, success: bool) -> None:

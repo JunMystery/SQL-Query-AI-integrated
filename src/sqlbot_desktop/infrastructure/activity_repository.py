@@ -48,28 +48,30 @@ class ActivityRepository:
                 """
                 DELETE FROM history
                 WHERE id NOT IN (
-                    SELECT id FROM history ORDER BY datetime(timestamp) DESC, id DESC LIMIT 100
+                    SELECT id FROM history ORDER BY timestamp DESC, id DESC LIMIT 100
                 )
                 """
             )
 
-    def list_history(self, date_filter: str | None = None) -> list[HistoryEntry]:
+    def list_history(self, date_filter: str | None = None, limit: int = 100) -> list[HistoryEntry]:
+        safe_limit = max(1, min(int(limit), 500))
         if date_filter:
             query = """
                 SELECT id, question, sql, timestamp, is_success
                 FROM history
                 WHERE date(timestamp) = date(?)
-                ORDER BY datetime(timestamp) DESC, id DESC
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
             """
-            params: Iterable[object] = (date_filter,)
+            params: Iterable[object] = (date_filter, safe_limit)
         else:
             query = """
                 SELECT id, question, sql, timestamp, is_success
                 FROM history
-                ORDER BY datetime(timestamp) DESC, id DESC
-                LIMIT 100
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
             """
-            params = ()
+            params = (safe_limit,)
 
         with self._connection() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
@@ -96,14 +98,18 @@ class ActivityRepository:
                 (question, sql, category, notes, bookmark_id),
             )
 
-    def list_bookmarks(self) -> list[BookmarkEntry]:
+    def list_bookmarks(self, limit: int = 100, offset: int = 0) -> list[BookmarkEntry]:
+        safe_limit = max(1, min(int(limit), 500))
+        safe_offset = max(0, int(offset))
         with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT id, question, sql, timestamp, category, notes
                 FROM bookmarks
-                ORDER BY datetime(timestamp) DESC, id DESC
-                """
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (safe_limit, safe_offset),
             ).fetchall()
         return [BookmarkEntry(row[0], row[1], row[2], row[3], row[4], row[5]) for row in rows]
 
@@ -147,5 +153,17 @@ class ActivityRepository:
                     category TEXT NOT NULL DEFAULT '',
                     notes TEXT NOT NULL DEFAULT ''
                 )
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_history_timestamp
+                ON history(timestamp DESC, id DESC)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_bookmarks_timestamp
+                ON bookmarks(timestamp DESC, id DESC)
                 """
             )

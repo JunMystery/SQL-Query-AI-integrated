@@ -241,16 +241,20 @@ class BookmarksDialog(QDialog):
 
         # Block signals temporarily to prevent event loops while redrawing
         self.table.blockSignals(True)
-        for row, entry in enumerate(self.entries):
-            self.table.setItem(row, 0, QTableWidgetItem(entry.timestamp))
-            self.table.setItem(row, 1, QTableWidgetItem(entry.category))
-            self.table.setItem(row, 2, QTableWidgetItem(entry.question))
-            self.table.setItem(row, 3, QTableWidgetItem(entry.sql))
-            self.table.setItem(row, 4, QTableWidgetItem(entry.notes))
-            self.table.setItem(row, 5, QTableWidgetItem(str(entry.id)))
+        self.table.setUpdatesEnabled(False)
+        try:
+            for row, entry in enumerate(self.entries):
+                self.table.setItem(row, 0, QTableWidgetItem(entry.timestamp))
+                self.table.setItem(row, 1, QTableWidgetItem(entry.category))
+                self.table.setItem(row, 2, QTableWidgetItem(entry.question))
+                self.table.setItem(row, 3, QTableWidgetItem(entry.sql))
+                self.table.setItem(row, 4, QTableWidgetItem(entry.notes))
+                self.table.setItem(row, 5, QTableWidgetItem(str(entry.id)))
 
-        self.table.blockSignals(False)
-        autosize_data_table_columns(self.table)
+            autosize_data_table_columns(self.table)
+        finally:
+            self.table.setUpdatesEnabled(True)
+            self.table.blockSignals(False)
         self.status_label.setText(f"{len(self.entries)} items")
 
     def _insert_entry(self, entry: BookmarkEntry) -> None:

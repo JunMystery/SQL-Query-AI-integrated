@@ -560,7 +560,12 @@ class MainController:
 
         def operation() -> list[str]:
             service.import_tables(self.profile.name, self.tables)
-            return service.refresh_sample_values(self.profile.name, connection, limit=3)
+            return service.refresh_sample_values(
+                self.profile.name,
+                connection,
+                limit=3,
+                check_cancelled=self._is_task_cancelled,
+            )
 
         self._start_task(
             tr("main.status_fetching_samples", "Đang lấy sample values..."),
@@ -769,6 +774,15 @@ class MainController:
             self._finish_task(show_busy_panel)
 
 
+            if self.task_cancelled:
+
+
+                self.view.statusBar().showMessage(tr("main.status_cancelled", "Đã hủy thao tác."))
+
+
+                return
+
+
             on_finished(result)
 
 
@@ -781,6 +795,15 @@ class MainController:
             self._finish_task(show_busy_panel)
 
 
+            if self.task_cancelled or self._is_cancel_message(message):
+
+
+                self.view.statusBar().showMessage(tr("main.status_cancelled", "Đã hủy thao tác."))
+
+
+                return
+
+
             if on_failed is not None:
 
 
@@ -790,7 +813,7 @@ class MainController:
             else:
 
 
-                if message in ("Cancelled", "Thao tác bị hủy", "cancelled", "CancelledError", tr("main.msg_cancelled", "Thao tác bị hủy")):
+                if self._is_cancel_message(message):
 
 
                     self.view.statusBar().showMessage(tr("main.status_cancelled", "Đã hủy thao tác."))
@@ -903,6 +926,35 @@ class MainController:
 
 
 
+    def _is_cancel_message(self, message: str) -> bool:
+
+
+        normalized = message.strip().lower()
+
+
+        return normalized in {
+
+
+            "cancelled",
+
+
+            "cancellederror",
+
+
+            "thao tac bi huy",
+
+
+            "thao tác bị hủy",
+
+
+            tr("main.msg_cancelled", "Thao tác bị hủy").strip().lower(),
+
+
+        }
+
+
+
+
 
     def cancel_task(self) -> None:
 
@@ -916,38 +968,32 @@ class MainController:
         self.task_cancelled = True
 
 
-        self.view.statusBar().showMessage("Đang hủy thao tác...")
+        self.ai_engine.cancel()
 
 
+        self.view.statusBar().showMessage(tr("main.status_cancelling", "Đang hủy thao tác..."))
 
+
+        if hasattr(self.view, "set_busy"):
+
+
+            self.view.set_busy(
+
+
+                True,
+
+
+                tr("main.status_cancelling", "Đang hủy thao tác..."),
+
+
+                tr("main.status_waiting_cancel", "Đang đợi tác vụ dừng an toàn."),
+
+
+            )
 
 
         if self.worker_thread and self.worker_thread.isRunning():
 
 
-            # Wait up to 150ms for cooperative cancellation
-
-
-            self.worker_thread.wait(150)
-
-
-            if self.worker_thread.isRunning():
-
-
-                # Forcefully terminate the thread if it's still blocking
-
-
-                self.worker_thread.terminate()
-
-
-                self.worker_thread.wait()
-
-
-                self._finish_task()
-
-
-                self._clear_worker()
-
-
-                self.view.statusBar().showMessage("Đã hủy thao tác.")
+            self.worker_thread.requestInterruption()
 

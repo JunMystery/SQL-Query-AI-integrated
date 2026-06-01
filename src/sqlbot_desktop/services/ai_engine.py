@@ -20,11 +20,14 @@ class AIEngine:
     """Load/unload AI backends and generate SQL."""
 
     API_KEY_ENV = "SQLBOT_AI_API_KEY"
+    API_REQUEST_TIMEOUT_SECONDS = 60
 
     def __init__(self) -> None:
         self.config: AIModelConfig | None = None
         self.model = None
         self._lock = threading.Lock()
+        self._response_lock = threading.Lock()
+        self._active_response = None
 
     @property
     def is_loaded(self) -> bool:
@@ -45,9 +48,19 @@ class AIEngine:
     def unload(self) -> None:
         import gc
 
+        self.cancel()
         self.model = None
         self.config = None
         gc.collect()
+
+    def cancel(self) -> None:
+        with self._response_lock:
+            response = self._active_response
+        if response is not None:
+            try:
+                response.close()
+            except OSError:
+                pass
 
     def generate(
         self,
@@ -158,6 +171,10 @@ class AIEngine:
                 n_batch=512,
                 verbose=False,
             )
+            if check_cancelled and check_cancelled():
+                self.model = None
+                self.config = None
+                return GenerationResult(False, message="Thao tác bị hủy")
             self.config = config
             return GenerationResult(True, message=f"Đã load local model: {model_path.name}")
         except Exception as exc:
@@ -239,11 +256,25 @@ class AIEngine:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
-                if check_cancelled and check_cancelled():
-                    raise RuntimeError("Cancelled")
-                return json.loads(response.read().decode("utf-8"))
+            if check_cancelled and check_cancelled():
+                raise RuntimeError("Cancelled")
+            with urllib.request.urlopen(request, timeout=self.API_REQUEST_TIMEOUT_SECONDS) as response:
+                with self._response_lock:
+                    self._active_response = response
+                try:
+                    if check_cancelled and check_cancelled():
+                        raise RuntimeError("Cancelled")
+                    raw_payload = response.read()
+                    if check_cancelled and check_cancelled():
+                        raise RuntimeError("Cancelled")
+                    return json.loads(raw_payload.decode("utf-8"))
+                finally:
+                    with self._response_lock:
+                        if self._active_response is response:
+                            self._active_response = None
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+            if check_cancelled and check_cancelled():
+                raise RuntimeError("Cancelled") from exc
             raise RuntimeError(f"Gọi API thất bại: {exc}") from exc
 
     def _extract_queries(self, raw_text: str) -> list[str]:
